@@ -84,6 +84,10 @@ export default function ScreeningConfigScreen() {
   const [busyVersion, setBusyVersion] = useState(null);
   const [historyPage, setHistoryPage] = useState(1);
   const HISTORY_PAGE_SIZE = 5;
+  const [watchlistPage, setWatchlistPage] = useState(1);
+  const WATCHLIST_PAGE_SIZE = 10;
+  const [countryPage, setCountryPage] = useState(1);
+  const COUNTRY_PAGE_SIZE = 5;
 
   const resetDraftFrom = useCallback((detail) => {
     setDraftWatchlist(toDraftWatchlist(detail?.watchlistEntries));
@@ -139,6 +143,28 @@ export default function ScreeningConfigScreen() {
   const historyRows = useMemo(
     () => configs.slice((historyPage - 1) * HISTORY_PAGE_SIZE, historyPage * HISTORY_PAGE_SIZE),
     [configs, historyPage]
+  );
+
+  const watchlistTotalPages = Math.max(1, Math.ceil(draftWatchlist.length / WATCHLIST_PAGE_SIZE));
+
+  useEffect(() => {
+    setWatchlistPage((p) => Math.min(p, watchlistTotalPages));
+  }, [watchlistTotalPages]);
+
+  const watchlistRows = useMemo(
+    () => draftWatchlist.slice((watchlistPage - 1) * WATCHLIST_PAGE_SIZE, watchlistPage * WATCHLIST_PAGE_SIZE),
+    [draftWatchlist, watchlistPage]
+  );
+
+  const countryTotalPages = Math.max(1, Math.ceil(draftCountries.length / COUNTRY_PAGE_SIZE));
+
+  useEffect(() => {
+    setCountryPage((p) => Math.min(p, countryTotalPages));
+  }, [countryTotalPages]);
+
+  const countryRows = useMemo(
+    () => draftCountries.slice((countryPage - 1) * COUNTRY_PAGE_SIZE, countryPage * COUNTRY_PAGE_SIZE),
+    [draftCountries, countryPage]
   );
 
   async function refreshList() {
@@ -344,11 +370,42 @@ export default function ScreeningConfigScreen() {
         >
           <DataTable
             columns={watchlistColumns}
-            rows={draftWatchlist}
+            rows={watchlistRows}
             rowKey={(r) => r.key}
             maxRows={null}
             empty={<EmptyState title="No watchlist entries">Add one, then publish a new version.</EmptyState>}
           />
+          {watchlistTotalPages > 1 && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                gap: 'var(--ds-space-3)',
+                marginTop: 'var(--ds-space-2)',
+              }}
+            >
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={watchlistPage <= 1}
+                onClick={() => setWatchlistPage((p) => Math.max(1, p - 1))}
+              >
+                Previous
+              </Button>
+              <Caption>
+                Page {watchlistPage} of {watchlistTotalPages}
+              </Caption>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={watchlistPage >= watchlistTotalPages}
+                onClick={() => setWatchlistPage((p) => Math.min(watchlistTotalPages, p + 1))}
+              >
+                Next
+              </Button>
+            </div>
+          )}
         </Card>
 
         <Card
@@ -363,11 +420,42 @@ export default function ScreeningConfigScreen() {
         >
           <DataTable
             columns={countryColumns}
-            rows={draftCountries}
+            rows={countryRows}
             rowKey={(r) => r.key}
             maxRows={null}
             empty={<EmptyState title="No country risk entries">Add one, then publish a new version.</EmptyState>}
           />
+          {countryTotalPages > 1 && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                gap: 'var(--ds-space-3)',
+                marginTop: 'var(--ds-space-2)',
+              }}
+            >
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={countryPage <= 1}
+                onClick={() => setCountryPage((p) => Math.max(1, p - 1))}
+              >
+                Previous
+              </Button>
+              <Caption>
+                Page {countryPage} of {countryTotalPages}
+              </Caption>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={countryPage >= countryTotalPages}
+                onClick={() => setCountryPage((p) => Math.min(countryTotalPages, p + 1))}
+              >
+                Next
+              </Button>
+            </div>
+          )}
         </Card>
 
         <Card title="Publish new version" style={{ marginTop: 'var(--ds-space-6)' }}>
