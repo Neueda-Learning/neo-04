@@ -46,17 +46,18 @@ async function refreshRows() {
 
   if (rows.length === 0) {
     el('rows').innerHTML =
-      '<tr><td colspan="3" class="empty">Nothing received yet — send one from the ' +
+      '<tr><td colspan="4" class="empty">Nothing received yet — send one from the ' +
       'sidecar at localhost:9000.</td></tr>';
     return;
   }
 
-  // Three columns, because demo_showcase has three. Replace this when you replace the table.
+  // Four columns: this module's own view of the screening record, not demo_showcase's three.
   el('rows').innerHTML = rows
     .map(
       (r) => `<tr>
         <td class="mono">${r.applicationId}</td>
-        <td><span class="st st-${r.status}">${r.status}</span></td>
+        <td><span class="st st-${r.machineOutcome}">${r.machineOutcome}</span></td>
+        <td><span class="st st-${r.finalOutcome}">${r.finalOutcome}</span></td>
         <td>${time(r.createdAt)}</td>
       </tr>`
     )

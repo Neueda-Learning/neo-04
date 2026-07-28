@@ -74,7 +74,7 @@ class ModuleApplicationTests {
 
     @Test
     void contextLoads() {
-        // Reaching here means Liquibase created demo_showcase and ddl-auto=validate accepted it.
+        // Reaching here means Liquibase created screening_record and ddl-auto=validate accepted it.
     }
 
     @Test
@@ -110,12 +110,16 @@ class ModuleApplicationTests {
                 .andExpect(jsonPath("$.serviceId").value("neo04"))
                 .andExpect(jsonPath("$.command").value("process-application"));
 
-        // The row the placeholder writes. Filtered by id, not counted: H2 is shared across the
-        // tests in this context, so a size assertion would depend on execution order.
+        // The row UC-00 writes, then the engine decides synchronously (SameThreadExecutor): no
+        // screening config exists in this context, so the verdict is CLEAR/SCR_NO_MATCH and the
+        // case is COMPLETE by the time this GET runs. Filtered by id, not counted: H2 is shared
+        // across the tests in this context, so a size assertion would depend on execution order.
         mvc.perform(get("/api/v1/applications"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[?(@.applicationId == 'IT-ONE')].status")
-                        .value(org.hamcrest.Matchers.hasItem("ACCEPTED")))
+                .andExpect(jsonPath("$[?(@.applicationId == 'IT-ONE')].processingStatus")
+                        .value(org.hamcrest.Matchers.hasItem("COMPLETE")))
+                .andExpect(jsonPath("$[?(@.applicationId == 'IT-ONE')].machineOutcome")
+                        .value(org.hamcrest.Matchers.hasItem("CLEAR")))
                 .andExpect(jsonPath("$[?(@.applicationId == 'IT-ONE')].createdAt")
                         .value(org.hamcrest.Matchers.everyItem(org.hamcrest.Matchers.notNullValue())));
     }

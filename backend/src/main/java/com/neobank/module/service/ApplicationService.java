@@ -1,45 +1,43 @@
 package com.neobank.module.service;
 
-import com.neobank.module.dto.DemoShowcaseView;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.neobank.module.dto.ScreeningRecordView;
+import com.neobank.module.integrations.orchestrator.Application;
 import com.neobank.module.integrations.orchestrator.ApplicationRequest;
 import com.neobank.module.integrations.orchestrator.OrchestratorClient;
+import com.neobank.module.model.CallbackStatus;
+import com.neobank.module.model.CountryRiskEntry;
 import com.neobank.module.model.Decision;
-import com.neobank.module.model.DemoShowcase;
-import com.neobank.module.repository.DemoShowcaseRepository;
+import com.neobank.module.model.ScreeningConfig;
+import com.neobank.module.model.ScreeningOutcome;
+import com.neobank.module.model.ScreeningRecord;
+import com.neobank.module.model.WatchlistEntry;
+import com.neobank.module.repository.CountryRiskEntryRepository;
+import com.neobank.module.repository.ScreeningConfigRepository;
+import com.neobank.module.repository.ScreeningRecordRepository;
+import com.neobank.module.repository.WatchlistEntryRepository;
+import com.neobank.module.service.matching.MatchVerdict;
+import com.neobank.module.service.matching.ScreeningMatcher;
+import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.Executor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * <h2>Your module's work happens here. This is the class you came here to write.</h2>
+ * <h2>UC-00 — Process Application, plus uc-02's matching engine.</h2>
  *
- * <p>An ordinary service class, like the ones you wrote in Week 2 — the difference is only that the
- * layers around it are already built. The controller has answered {@code 202} and let the
- * orchestrator go; {@code integrations.orchestrator} handles both ends of the wire; the repository
- * handles storage. None of that changes when your logic changes.</p>
- *
- * <p><b>Right now it does the three smallest things that prove the contract works:</b> it prints a
- * line, it writes a row, and it reports {@code ACCEPTED}. All three are placeholders. Replacing
- * them <em>one at a time</em>, keeping the journey green after each, is the way to spend the first
- * hour — the most common way to lose a hackathon day is writing all the logic before running any
- * of it.</p>
- *
- * <h3>What to replace, in order</h3>
- *
- * <ol>
- *   <li><b>The log line</b> → whatever your module actually needs to say.</li>
- *   <li><b>The row</b> → your own table. {@link DemoShowcase} explains how; the short version is a
- *       new Liquibase change set and a new entity, not extra columns on {@code demo_showcase}.</li>
- *   <li><b>The always-{@code ACCEPTED} status</b> → your rules. Read what you need off
- *       {@code request.application()} — it is fully typed, so your IDE will show you the fields —
- *       and return {@code ACCEPTED}, {@code REJECTED} or {@code REFERRED} with a reason a bank
- *       employee could read to a customer. Keep the rules in a method of their own, and test them
- *       without Spring: a rule is a function from an application to an outcome.</li>
- * </ol>
+ * <p>The one durable thing UC-00 owns: exactly one {@link ScreeningRecord} row per
+ * {@code applicationId}, written on the calling thread before the {@code 202} goes out, keyed so a
+ * repeated {@code /execute} for the same application is a no-op rather than a second row. Deciding
+ * the actual outcome then runs off-thread in {@link #decide}: match the watchlist and high-risk
+ * countries via {@link ScreeningMatcher}, write the verdict back onto the same row, and report it to
+ * the orchestrator.</p>
  */
 @Service
 public class ApplicationService {
@@ -47,74 +45,152 @@ public class ApplicationService {
     private static final Logger log = LoggerFactory.getLogger(ApplicationService.class);
 
     private final Executor executor;
-    private final DemoShowcaseRepository demoShowcase;
+    private final ScreeningRecordRepository screeningRecords;
     private final OrchestratorClient orchestrator;
+    private final ScreeningConfigRepository screeningConfigs;
+    private final WatchlistEntryRepository watchlistEntries;
+    private final CountryRiskEntryRepository countryRiskEntries;
+    private final ScreeningMatcher matcher;
+    private final ObjectMapper json;
 
-    /**
-     * {@code applicationTaskExecutor} is the thread pool Spring Boot configures for you. Tune it in
-     * {@code application.yml} under {@code spring.task.execution.*} — pool size matters once your
-     * logic calls a slow mock, because that is what limits how many applications you can handle at
-     * once.
-     */
     public ApplicationService(@Qualifier("applicationTaskExecutor") Executor executor,
-                              DemoShowcaseRepository demoShowcase,
-                              OrchestratorClient orchestrator) {
+                              ScreeningRecordRepository screeningRecords,
+                              OrchestratorClient orchestrator,
+                              ScreeningConfigRepository screeningConfigs,
+                              WatchlistEntryRepository watchlistEntries,
+                              CountryRiskEntryRepository countryRiskEntries,
+                              ScreeningMatcher matcher,
+                              ObjectMapper json) {
         this.executor = executor;
-        this.demoShowcase = demoShowcase;
+        this.screeningRecords = screeningRecords;
         this.orchestrator = orchestrator;
+        this.screeningConfigs = screeningConfigs;
+        this.watchlistEntries = watchlistEntries;
+        this.countryRiskEntries = countryRiskEntries;
+        this.matcher = matcher;
+        this.json = json;
     }
 
     /**
-     * Hand the work to the pool and return immediately.
-     *
-     * <p>The controller calls this and then writes the {@code 202}. <b>Nothing here may block:</b>
-     * the orchestrator is holding a connection open, and a module that does its work on the request
-     * thread turns a fast journey into a slow one.</p>
+     * Open the case synchronously (so the row exists before the {@code 202} ack), then hand the
+     * actual decision off to the executor. Nothing here may block on the decision itself — that is
+     * the executor's job.
      */
     public void processApplicationAsync(ApplicationRequest request) {
-        executor.execute(() -> processApplication(request));
+        String applicationId = request.applicationId();
+        log.info("RECEIVED {}", request.summary());
+
+        boolean opened;
+        try {
+            opened = openCase(applicationId);
+        } catch (RuntimeException e) {
+            log.error("Could not open a screening case for {} — referring", applicationId, e);
+            orchestrator.applicationStatusUpdate(applicationId, Decision.REFERRED, "module error: " + e);
+            return;
+        }
+
+        if (!opened) {
+            log.info("{} already has a screening record — ignoring duplicate execute", applicationId);
+            return;
+        }
+
+        executor.execute(() -> decide(request));
     }
 
     /**
-     * Do the work: say something, store something, report something.
-     *
-     * <p>Package-private on purpose — the outside world goes through
-     * {@link #processApplicationAsync}, and a unit test can call this directly on the test thread,
-     * which is what makes it testable without a thread pool.</p>
-     *
-     * <p><b>Deliberately not {@code @Transactional}.</b> The repository's own save is transactional;
-     * wrapping the whole method would put the HTTP call inside that transaction, so a slow or
-     * unreachable orchestrator could roll back a row this module had already committed. Store
-     * first, report second, and let the two fail independently. When you add several writes that
-     * must land together, put {@code @Transactional} on a method that does only the writes.</p>
+     * The only write UC-00 makes: one {@link ScreeningRecord} row, {@code PENDING}/{@code IN_PROGRESS}
+     * everywhere a real verdict will eventually go. The unique constraint on {@code application_id}
+     * is the idempotency guard — a race between two concurrent {@code /execute} calls for the same
+     * id collapses to exactly one row via {@link DataIntegrityViolationException}, not an exception
+     * that reaches the caller.
      */
-    void processApplication(ApplicationRequest request) {
+    @Transactional
+    boolean openCase(String applicationId) {
+        if (screeningRecords.existsByApplicationId(applicationId)) {
+            return false;
+        }
+        try {
+            screeningRecords.save(new ScreeningRecord(applicationId));
+            return true;
+        } catch (DataIntegrityViolationException e) {
+            return false;
+        }
+    }
+
+    /**
+     * uc-02's matching engine: match against the current {@link ScreeningConfig}'s watchlist and
+     * high-risk countries, write the verdict onto this application's row, then report it to the
+     * orchestrator. Package-private so a unit test can call it directly on the test thread.
+     *
+     * <p>Any failure here is reported as {@link Decision#REFERRED} rather than left to the
+     * orchestrator's timeout — the row was already opened, so there is always something to
+     * report.</p>
+     */
+    void decide(ApplicationRequest request) {
         String applicationId = request.applicationId();
         try {
-            // 1 — say something. summary() is the one line every module logs on receipt.
-            log.info("Hello world from processApplication — {}", request.summary());
+            Application.Applicant applicant = request.application() == null
+                    ? null : request.application().applicant();
+            ScreeningConfig config = screeningConfigs.findCurrent().orElse(null);
+            List<CountryRiskEntry> countryRisks = config == null
+                    ? List.of() : countryRiskEntries.findAllByVersionOrderByIdAsc(config.getVersion());
+            Integer configVersion = config == null ? null : config.getVersion();
+            List<WatchlistEntry> watchlist = config == null
+                    ? List.of() : watchlistEntries.findAllByVersionOrderByIdAsc(config.getVersion());
 
-            // 2 — store something. ⚠️ demo_showcase is a placeholder; see DemoShowcase.
-            demoShowcase.save(new DemoShowcase(applicationId, Decision.ACCEPTED));
+            MatchVerdict verdict = matcher.match(applicant, watchlist, countryRisks);
+            String evidence = writeEvidence(verdict);
 
-            // 3 — report something. Always ACCEPTED until you write rules.
-            orchestrator.applicationStatusUpdate(applicationId, Decision.ACCEPTED,
-                    "hello world from processApplication");
+            applyDecision(applicationId, verdict, configVersion, evidence);
+
+            Decision decision = toDecision(verdict.outcome());
+            orchestrator.applicationStatusUpdate(applicationId, decision, verdict.reasonCode());
+            recordCallback(applicationId, CallbackStatus.SENT);
+            log.info("{} decided {} ({})", applicationId, verdict.outcome(), verdict.reasonCode());
         } catch (RuntimeException e) {
-            // A module that throws never reports, and the orchestrator then waits out its 30s
-            // timeout and ends the journey FAILED with nothing to explain it. So: refer it to a
-            // human and say why. Keep this guard when you replace the body above.
-            log.error("processApplication failed for {} — referring", applicationId, e);
-            orchestrator.applicationStatusUpdate(applicationId, Decision.REFERRED,
-                    "module error: " + e);
+            log.error("Could not decide a screening outcome for {} — referring", applicationId, e);
+            orchestrator.applicationStatusUpdate(applicationId, Decision.REFERRED, "module error: " + e);
+            recordCallback(applicationId, CallbackStatus.FAILED);
         }
+    }
+
+    @Transactional
+    void applyDecision(String applicationId, MatchVerdict verdict, Integer configVersion, String evidence) {
+        screeningRecords.findByApplicationId(applicationId).ifPresent(record -> {
+            record.applyDecision(verdict.outcome(), verdict.reasonCode(), configVersion, evidence);
+            screeningRecords.save(record);
+        });
+    }
+
+    @Transactional
+    void recordCallback(String applicationId, CallbackStatus status) {
+        screeningRecords.findByApplicationId(applicationId).ifPresent(record -> {
+            record.recordCallback(status, Instant.now());
+            screeningRecords.save(record);
+        });
+    }
+
+    private String writeEvidence(MatchVerdict verdict) {
+        try {
+            return json.writeValueAsString(verdict.evidence());
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("could not serialise match evidence", e);
+        }
+    }
+
+    private static Decision toDecision(ScreeningOutcome outcome) {
+        return switch (outcome) {
+            case HIT -> Decision.REJECTED;
+            case REVIEW -> Decision.REFERRED;
+            case CLEAR, PENDING -> Decision.ACCEPTED;
+        };
     }
 
     /** Everything this module has answered, newest first — what its own UI reads. */
     @Transactional(readOnly = true)
-    public List<DemoShowcaseView> findAll() {
-        return demoShowcase.findAllByOrderByCreatedAtDescIdDesc().stream()
-                .map(DemoShowcaseView::of)
+    public List<ScreeningRecordView> findAll() {
+        return screeningRecords.findAllByOrderByCreatedAtDescIdDesc().stream()
+                .map(ScreeningRecordView::of)
                 .toList();
     }
 }
