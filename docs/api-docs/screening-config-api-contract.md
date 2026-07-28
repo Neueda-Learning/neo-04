@@ -32,7 +32,7 @@ a new section here — do not repurpose these endpoints to do it.
   "samplingFrequency": 10,
   "currentVersion": true,
   "createdBy": "ops-team",
-  "createdAt": "2026-07-28T09:15:00Z"
+  "createdAt": "2026-07-28T09:15:00Z",
 }
 ```
 
@@ -55,12 +55,17 @@ a new section here — do not repurpose these endpoints to do it.
       "nationality": "GB",
       "listType": "SANCTIONS",
       "source": "OFAC",
-      "createdAt": "2026-07-28T09:15:00Z"
-    }
+      "createdAt": "2026-07-28T09:15:00Z",
+    },
   ],
   "countryRiskEntries": [
-    { "id": 55, "countryCode": "IRN", "countryName": "Iran", "riskLevel": "HIGH" }
-  ]
+    {
+      "id": 55,
+      "countryCode": "IRN",
+      "countryName": "Iran",
+      "riskLevel": "HIGH",
+    },
+  ],
 }
 ```
 
@@ -79,12 +84,12 @@ a new section here — do not repurpose these endpoints to do it.
       "dateOfBirth": "1980-04-12",
       "nationality": "GB",
       "listType": "SANCTIONS",
-      "source": "OFAC"
-    }
+      "source": "OFAC",
+    },
   ],
   "countryRiskEntries": [
-    { "countryCode": "IRN", "countryName": "Iran", "riskLevel": "HIGH" }
-  ]
+    { "countryCode": "IRN", "countryName": "Iran", "riskLevel": "HIGH" },
+  ],
 }
 ```
 
@@ -166,7 +171,7 @@ Same as every other endpoint in this service — see `GlobalExceptionHandler`:
   "timestamp": "2026-07-28T09:15:00Z",
   "status": 409,
   "error": "Conflict",
-  "message": "version 3 is the current version and cannot be deleted"
+  "message": "version 3 is the current version and cannot be deleted",
 }
 ```
 
