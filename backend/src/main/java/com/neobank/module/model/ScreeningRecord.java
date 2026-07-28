@@ -123,14 +123,17 @@ public class ScreeningRecord {
 
     /**
      * The engine use case's write: replaces {@code PENDING}/{@code PENDING} with the real verdict.
-     * {@code finalOutcome} starts equal to {@code machineOutcome} — only a later analyst override
-     * (a different use case) may make them diverge. Kept dumb on purpose: no matching rule lives
-     * here, only field assignment — see the class doc.
+     * {@code machineOutcome} and {@code finalOutcome} are usually the same value — they only
+     * diverge for a sampled decision (uc-02 rule 4), where {@code machineOutcome} keeps what the
+     * rules actually computed and {@code finalOutcome} is forced to {@code REVIEW} so an analyst
+     * always sees the machine's own answer even though the case is parked. A later analyst
+     * override (a different use case) is the only other thing allowed to make them diverge. Kept
+     * dumb on purpose: no matching rule lives here, only field assignment — see the class doc.
      */
-    public void applyDecision(ScreeningOutcome outcome, String reasonCode, Integer configVersion,
-                              String evidence) {
-        this.machineOutcome = outcome.name();
-        this.finalOutcome = outcome.name();
+    public void applyDecision(ScreeningOutcome machineOutcome, ScreeningOutcome finalOutcome,
+                              String reasonCode, Integer configVersion, String evidence) {
+        this.machineOutcome = machineOutcome.name();
+        this.finalOutcome = finalOutcome.name();
         this.reasonCode = reasonCode;
         this.configVersion = configVersion;
         this.evidence = evidence;

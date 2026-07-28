@@ -31,6 +31,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * UC-00: exactly one row per {@code applicationId}, written before the executor ever runs, plus
@@ -264,5 +265,73 @@ class ApplicationServiceTest {
 
         verify(orchestrator).applicationStatusUpdate(eq("SIM-15"), eq(Decision.REFERRED), any());
         assertThat(row.getCallbackStatus()).isEqualTo("FAILED");
+    }
+
+    @Test
+    void aHighConfidenceFuzzyNameMatchWithTheSameDobIsAnHitReportedAsRejected() {
+        when(screeningConfigs.findCurrent()).thenReturn(Optional.of(new ScreeningConfig(1, 7, true, "seed")));
+        when(watchlistEntries.findAllByVersionOrderByIdAsc(1)).thenReturn(java.util.List.of(
+                new WatchlistEntry(1, "WL-001", "Marek", "Nowak", java.time.LocalDate.of(1961, 4, 19),
+                        "PL", "SANCTIONS", "seed")));
+        ScreeningRecord row = new ScreeningRecord("SIM-16");
+        when(screeningRecords.findByApplicationId("SIM-16")).thenReturn(Optional.of(row));
+        ApplicationService service = service();
+
+        // "marek novak" vs "marek nowak" — a one-letter typo, same DOB: similarity ~0.91 > 0.8.
+        service.decide(requestFor("SIM-16", "Marek Novak", "1961-04-19", null));
+
+        assertThat(row.getMachineOutcome()).isEqualTo("HIT");
+        assertThat(row.getReasonCode()).isEqualTo("SCR_FUZZY_MATCH_HIGH_CONFIDENCE");
+        verify(orchestrator).applicationStatusUpdate("SIM-16", Decision.REJECTED, "SCR_FUZZY_MATCH_HIGH_CONFIDENCE");
+    }
+
+    @Test
+    void aLowerConfidenceFuzzyNameMatchWithTheSameDobIsReviewNeedingAnalystConfirm() {
+        when(screeningConfigs.findCurrent()).thenReturn(Optional.of(new ScreeningConfig(1, 7, true, "seed")));
+        when(watchlistEntries.findAllByVersionOrderByIdAsc(1)).thenReturn(java.util.List.of(
+                new WatchlistEntry(1, "WL-009", "John", "Smith", java.time.LocalDate.of(1980, 1, 1),
+                        "US", "SANCTIONS", "seed")));
+        ScreeningRecord row = new ScreeningRecord("SIM-17");
+        when(screeningRecords.findByApplicationId("SIM-17")).thenReturn(Optional.of(row));
+        ApplicationService service = service();
+
+        // "jon smit" vs "john smith" — same DOB, a much looser spelling: similarity ~0.70.
+        service.decide(requestFor("SIM-17", "Jon Smit", "1980-01-01", null));
+
+        assertThat(row.getMachineOutcome()).isEqualTo("REVIEW");
+        assertThat(row.getReasonCode()).isEqualTo("SCR_FUZZY_MATCH_NEEDS_CONFIRM");
+        verify(orchestrator).applicationStatusUpdate("SIM-17", Decision.REFERRED, "SCR_FUZZY_MATCH_NEEDS_CONFIRM");
+    }
+
+    @Test
+    void everySamplingFrequencyThRowIsForcedToReviewButKeepsTheMachineOutcome() {
+        when(screeningConfigs.findCurrent()).thenReturn(Optional.of(new ScreeningConfig(1, 7, true, "seed")));
+        ScreeningRecord row = new ScreeningRecord("SIM-18");
+        ReflectionTestUtils.setField(row, "id", 14L); // the fixture's own 14th-decision checkpoint (uc-02 AC7)
+        when(screeningRecords.findByApplicationId("SIM-18")).thenReturn(Optional.of(row));
+        ApplicationService service = service();
+
+        service.decide(requestFor("SIM-18", "Nobody Special", "1990-01-01", null));
+
+        assertThat(row.getMachineOutcome()).isEqualTo("CLEAR"); // what the rules actually decided
+        assertThat(row.getFinalOutcome()).isEqualTo("REVIEW");  // parked for a mandatory sample confirm
+        assertThat(row.getReasonCode()).isEqualTo("SCR_SAMPLED_FOR_REVIEW");
+        verify(orchestrator).applicationStatusUpdate("SIM-18", Decision.REFERRED, "SCR_SAMPLED_FOR_REVIEW");
+    }
+
+    @Test
+    void aRowNotOnASamplingBoundaryIsUnaffectedBySampling() {
+        when(screeningConfigs.findCurrent()).thenReturn(Optional.of(new ScreeningConfig(1, 7, true, "seed")));
+        ScreeningRecord row = new ScreeningRecord("SIM-19");
+        ReflectionTestUtils.setField(row, "id", 15L);
+        when(screeningRecords.findByApplicationId("SIM-19")).thenReturn(Optional.of(row));
+        ApplicationService service = service();
+
+        service.decide(requestFor("SIM-19", "Nobody Special", "1990-01-01", null));
+
+        assertThat(row.getMachineOutcome()).isEqualTo("CLEAR");
+        assertThat(row.getFinalOutcome()).isEqualTo("CLEAR");
+        assertThat(row.getReasonCode()).isEqualTo("SCR_NO_MATCH");
+        verify(orchestrator).applicationStatusUpdate("SIM-19", Decision.ACCEPTED, "SCR_NO_MATCH");
     }
 }
