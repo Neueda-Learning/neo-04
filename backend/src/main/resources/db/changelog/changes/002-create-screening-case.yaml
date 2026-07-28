@@ -21,8 +21,8 @@ databaseChangeLog:
                     nullable: false
               - column:
                   name: current_version
-                  type: BOOLEAN
-                  defaultValueBoolean: false
+                  type: TINYINT
+                  defaultValueNumeric: 0
                   constraints:
                     nullable: false
               - column:
