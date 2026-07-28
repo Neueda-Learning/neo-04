@@ -12,7 +12,6 @@ import {
   FormGrid,
   Modal,
   PageHeader,
-  Section,
   Select,
   Tag,
   TextInput,
@@ -80,14 +79,18 @@ export default function ScreeningConfigScreen() {
   const [countryModalOpen, setCountryModalOpen] = useState(false);
   const [newCountry, setNewCountry] = useState(blankCountry());
 
-  const [preview, setPreview] = useState(null);
   const [busyVersion, setBusyVersion] = useState(null);
   const [historyPage, setHistoryPage] = useState(1);
-  const HISTORY_PAGE_SIZE = 5;
+  const HISTORY_PAGE_SIZE = 10;
   const [watchlistPage, setWatchlistPage] = useState(1);
   const WATCHLIST_PAGE_SIZE = 10;
   const [countryPage, setCountryPage] = useState(1);
   const COUNTRY_PAGE_SIZE = 5;
+
+  const [mode, setMode] = useState('history'); // 'history' | 'edit' | 'view'
+  const [viewingVersion, setViewingVersion] = useState(null);
+  const [viewLoading, setViewLoading] = useState(false);
+  const [loadingVersion, setLoadingVersion] = useState(null);
 
   const resetDraftFrom = useCallback((detail) => {
     setDraftWatchlist(toDraftWatchlist(detail?.watchlistEntries));
@@ -134,15 +137,17 @@ export default function ScreeningConfigScreen() {
     return baseline !== draft;
   }, [current, samplingFrequency, draftWatchlist, draftCountries]);
 
-  const historyTotalPages = Math.max(1, Math.ceil(configs.length / HISTORY_PAGE_SIZE));
+  const supersededConfigs = useMemo(() => configs.filter((c) => !c.currentVersion), [configs]);
+
+  const historyTotalPages = Math.max(1, Math.ceil(supersededConfigs.length / HISTORY_PAGE_SIZE));
 
   useEffect(() => {
     setHistoryPage((p) => Math.min(p, historyTotalPages));
   }, [historyTotalPages]);
 
   const historyRows = useMemo(
-    () => configs.slice((historyPage - 1) * HISTORY_PAGE_SIZE, historyPage * HISTORY_PAGE_SIZE),
-    [configs, historyPage]
+    () => supersededConfigs.slice((historyPage - 1) * HISTORY_PAGE_SIZE, historyPage * HISTORY_PAGE_SIZE),
+    [supersededConfigs, historyPage]
   );
 
   const watchlistTotalPages = Math.max(1, Math.ceil(draftWatchlist.length / WATCHLIST_PAGE_SIZE));
@@ -214,19 +219,41 @@ export default function ScreeningConfigScreen() {
       resetDraftFrom(detail);
       await refreshList();
       setNotice({ tone: 'positive', text: `Version ${version} is now current.` });
+      return detail;
     } catch (e) {
       setNotice({ tone: 'negative', text: e.message });
+      return null;
     } finally {
       setBusyVersion(null);
     }
   }
 
-  async function openPreview(version) {
+  function editCurrent() {
+    setMode('edit');
+  }
+
+  function backToHistory() {
+    setMode('history');
+    setViewingVersion(null);
+  }
+
+  async function openVersion(version) {
+    setLoadingVersion(version);
+    setViewLoading(true);
     try {
-      setPreview(await api.getScreeningConfigVersion(version));
+      setViewingVersion(await api.getScreeningConfigVersion(version));
+      setMode('view');
     } catch (e) {
       setNotice({ tone: 'negative', text: e.message });
+    } finally {
+      setViewLoading(false);
+      setLoadingVersion(null);
     }
+  }
+
+  async function activateAndEdit(version) {
+    const detail = await activate(version);
+    if (detail) setMode('edit');
   }
 
   function addWatchlistEntry() {
@@ -304,7 +331,7 @@ export default function ScreeningConfigScreen() {
       key: 'currentVersion',
       header: 'Status',
       tight: true,
-      render: (r) => (r.currentVersion ? <Badge tone="positive">Current</Badge> : <Tag>superseded</Tag>),
+      render: () => <Tag>superseded</Tag>,
     },
     { key: 'samplingFrequency', header: 'Sample every' },
     { key: 'createdBy', header: 'Published by' },
@@ -314,21 +341,17 @@ export default function ScreeningConfigScreen() {
       header: '',
       render: (r) => (
         <div style={{ display: 'flex', gap: 'var(--ds-space-2)' }}>
-          <Button variant="ghost" size="sm" onClick={() => openPreview(r.version)}>
+          <Button
+            variant="ghost"
+            size="sm"
+            busy={viewLoading && loadingVersion === r.version}
+            onClick={() => openVersion(r.version)}
+          >
             View
           </Button>
-          {!r.currentVersion && (
-            <>
-              <Button
-                variant="secondary"
-                size="sm"
-                busy={busyVersion === r.version}
-                onClick={() => activate(r.version)}
-              >
-                Activate
-              </Button>
-            </>
-          )}
+          <Button variant="secondary" size="sm" busy={busyVersion === r.version} onClick={() => activate(r.version)}>
+            Activate
+          </Button>
         </div>
       ),
     },
@@ -358,7 +381,97 @@ export default function ScreeningConfigScreen() {
         </Alert>
       )}
 
-      <div>
+      {mode === 'history' && (
+        <Card
+          title="Version history"
+          subtitle={`${configs.length} version${configs.length === 1 ? '' : 's'}`}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: 'var(--ds-space-4)',
+              marginBottom: 'var(--ds-space-4)',
+              border: '1px solid var(--ds-color-border)',
+              borderRadius: 'var(--ds-radius-md)',
+            }}
+          >
+            {current ? (
+              <>
+                <div>
+                  <div style={{ display: 'flex', gap: 'var(--ds-space-2)', alignItems: 'center' }}>
+                    <Tag mono>v{current.version}</Tag>
+                    <Badge tone="positive">Current</Badge>
+                  </div>
+                  <Caption>
+                    Sample every {current.samplingFrequency} · published {dateTime(current.createdAt)} by{' '}
+                    {current.createdBy}
+                  </Caption>
+                </div>
+                <Button variant="primary" size="sm" onClick={editCurrent}>
+                  Edit
+                </Button>
+              </>
+            ) : (
+              <>
+                <Caption>No version published yet.</Caption>
+                <Button variant="primary" size="sm" onClick={editCurrent}>
+                  Create first version
+                </Button>
+              </>
+            )}
+          </div>
+
+          <DataTable
+            columns={historyColumns}
+            rows={historyRows}
+            rowKey={(r) => r.version}
+            maxRows={null}
+            footnote="oldest supersedable"
+            empty={<EmptyState title="No superseded versions yet">Past versions appear here once you publish a new one.</EmptyState>}
+          />
+          {historyTotalPages > 1 && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                gap: 'var(--ds-space-3)',
+                marginTop: 'var(--ds-space-2)',
+              }}
+            >
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={historyPage <= 1}
+                onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
+              >
+                Previous
+              </Button>
+              <Caption>
+                Page {historyPage} of {historyTotalPages}
+              </Caption>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={historyPage >= historyTotalPages}
+                onClick={() => setHistoryPage((p) => Math.min(historyTotalPages, p + 1))}
+              >
+                Next
+              </Button>
+            </div>
+          )}
+          <Caption>Configuration is insert-only — nothing here is ever updated, only superseded.</Caption>
+        </Card>
+      )}
+
+      {mode === 'edit' && (
+        <div>
+          <Button variant="ghost" size="sm" onClick={backToHistory}>
+            ← Back to version history
+          </Button>
+
         <Card
           title="Watchlist entries"
           subtitle={`${draftWatchlist.length} in this draft`}
@@ -367,6 +480,7 @@ export default function ScreeningConfigScreen() {
               Add entry
             </Button>
           }
+          style={{ marginTop: 'var(--ds-space-4)' }}
         >
           <DataTable
             columns={watchlistColumns}
@@ -506,54 +620,56 @@ export default function ScreeningConfigScreen() {
               : 'No changes yet — add or remove an entry above to build the next version.'}
           </Caption>
         </Card>
+        </div>
+      )}
 
-        <Card
-          title="Version history"
-          subtitle={`${configs.length} version${configs.length === 1 ? '' : 's'}`}
-          style={{ marginTop: 'var(--ds-space-6)' }}
-        >
-          <DataTable
-            columns={historyColumns}
-            rows={historyRows}
-            rowKey={(r) => r.version}
-            maxRows={null}
-            footnote="oldest supersedable, current always shown"
-            empty={<EmptyState title="No versions yet">Publish the first version above.</EmptyState>}
-          />
-          {historyTotalPages > 1 && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'flex-end',
-                gap: 'var(--ds-space-3)',
-                marginTop: 'var(--ds-space-2)',
-              }}
+      {mode === 'view' && viewingVersion && (
+        <div>
+          <Button variant="ghost" size="sm" onClick={backToHistory}>
+            ← Back to version history
+          </Button>
+          <Caption>
+            Version {viewingVersion.version} · published {dateTime(viewingVersion.createdAt)} by{' '}
+            {viewingVersion.createdBy} · sample every {viewingVersion.samplingFrequency} · superseded (read-only)
+          </Caption>
+
+          <Card
+            title={`Watchlist entries (${viewingVersion.watchlistEntries.length})`}
+            style={{ marginTop: 'var(--ds-space-4)' }}
+          >
+            <DataTable
+              columns={watchlistColumns.slice(0, -1)}
+              rows={viewingVersion.watchlistEntries.map((e, i) => ({ ...e, key: `vw-${i}` }))}
+              rowKey={(r) => r.key}
+              maxRows={null}
+              empty={<EmptyState title="No watchlist entries in this version" />}
+            />
+          </Card>
+
+          <Card
+            title={`Country risk list (${viewingVersion.countryRiskEntries.length})`}
+            style={{ marginTop: 'var(--ds-space-6)' }}
+          >
+            <DataTable
+              columns={countryColumns.slice(0, -1)}
+              rows={viewingVersion.countryRiskEntries.map((e, i) => ({ ...e, key: `vc-${i}` }))}
+              rowKey={(r) => r.key}
+              maxRows={null}
+              empty={<EmptyState title="No country risk entries in this version" />}
+            />
+          </Card>
+
+          <FormActions>
+            <Button
+              variant="primary"
+              busy={busyVersion === viewingVersion.version}
+              onClick={() => activateAndEdit(viewingVersion.version)}
             >
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={historyPage <= 1}
-                onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
-              >
-                Previous
-              </Button>
-              <Caption>
-                Page {historyPage} of {historyTotalPages}
-              </Caption>
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={historyPage >= historyTotalPages}
-                onClick={() => setHistoryPage((p) => Math.min(historyTotalPages, p + 1))}
-              >
-                Next
-              </Button>
-            </div>
-          )}
-          <Caption>Configuration is insert-only — nothing here is ever updated, only superseded.</Caption>
-        </Card>
-      </div>
+              Activate this version
+            </Button>
+          </FormActions>
+        </div>
+      )}
 
       <Modal
         open={watchlistModalOpen}
@@ -700,43 +816,6 @@ export default function ScreeningConfigScreen() {
             </Field>
           </FormGrid.Full>
         </FormGrid>
-      </Modal>
-
-      <Modal
-        open={!!preview}
-        title={preview ? `Version ${preview.version}` : ''}
-        onClose={() => setPreview(null)}
-        wide
-        footer={
-          <Button variant="ghost" onClick={() => setPreview(null)}>
-            Close
-          </Button>
-        }
-      >
-        {preview && (
-          <>
-            <Caption>
-              Published {dateTime(preview.createdAt)} by {preview.createdBy} · sample every{' '}
-              {preview.samplingFrequency} · {preview.currentVersion ? 'current version' : 'superseded'}
-            </Caption>
-            <Section title={`Watchlist (${preview.watchlistEntries.length})`} />
-            <DataTable
-              columns={watchlistColumns.slice(0, -1)}
-              rows={preview.watchlistEntries.map((e, i) => ({ ...e, key: `pw-${i}` }))}
-              rowKey={(r) => r.key}
-              maxRows={null}
-              empty={<EmptyState title="No watchlist entries in this version" />}
-            />
-            <Section title={`Country risk (${preview.countryRiskEntries.length})`} style={{ marginTop: 'var(--ds-space-6)' }} />
-            <DataTable
-              columns={countryColumns.slice(0, -1)}
-              rows={preview.countryRiskEntries.map((e, i) => ({ ...e, key: `pc-${i}` }))}
-              rowKey={(r) => r.key}
-              maxRows={null}
-              empty={<EmptyState title="No country risk entries in this version" />}
-            />
-          </>
-        )}
       </Modal>
     </>
   );
