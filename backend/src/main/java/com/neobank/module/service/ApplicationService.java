@@ -137,16 +137,17 @@ public class ApplicationService {
             Integer configVersion = config == null ? null : config.getVersion();
             List<WatchlistEntry> watchlist = config == null
                     ? List.of() : watchlistEntries.findAllByVersionOrderByIdAsc(config.getVersion());
+            Integer samplingFrequency = config == null ? null : config.getSamplingFrequency();
 
             MatchVerdict verdict = matcher.match(applicant, watchlist, countryRisks);
             String evidence = writeEvidence(verdict);
 
-            applyDecision(applicationId, verdict, configVersion, evidence);
+            AppliedDecision applied = applyDecision(applicationId, verdict, configVersion, evidence, samplingFrequency);
 
-            Decision decision = toDecision(verdict.outcome());
-            orchestrator.applicationStatusUpdate(applicationId, decision, verdict.reasonCode());
+            Decision decision = toDecision(applied.finalOutcome());
+            orchestrator.applicationStatusUpdate(applicationId, decision, applied.reasonCode());
             recordCallback(applicationId, CallbackStatus.SENT);
-            log.info("{} decided {} ({})", applicationId, verdict.outcome(), verdict.reasonCode());
+            log.info("{} decided {} ({})", applicationId, applied.finalOutcome(), applied.reasonCode());
         } catch (RuntimeException e) {
             log.error("Could not decide a screening outcome for {} — referring", applicationId, e);
             orchestrator.applicationStatusUpdate(applicationId, Decision.REFERRED, "module error: " + e);
@@ -154,12 +155,35 @@ public class ApplicationService {
         }
     }
 
+    /** What actually got written to the row — the sampled outcome/reason if uc-02 rule 4 fired, else the matcher's own. */
+    private record AppliedDecision(ScreeningOutcome finalOutcome, String reasonCode) {
+    }
+
+    /**
+     * uc-02 rule 4 — every {@code samplingFrequency}th first-time decision is forced to
+     * {@code REVIEW} for a mandatory business/analyst confirmation, whatever rules 1–3 (and the
+     * fuzzy tiers) concluded. {@code machineOutcome} keeps the real verdict; only
+     * {@code finalOutcome} is overridden, and the reason becomes {@code SCR_SAMPLED_FOR_REVIEW}
+     * alone (uc-02 AC7) — not appended to the machine's own reason codes.
+     *
+     * <p>The row's own auto-increment {@code id}, assigned synchronously when UC-00 opens the
+     * case, is the sample position: it is unique and ordered by receipt with no extra counter or
+     * race to manage. A {@code null} id only happens in a unit test that never persisted the row
+     * for real — treated as "not sampled" rather than throwing.</p>
+     */
     @Transactional
-    void applyDecision(String applicationId, MatchVerdict verdict, Integer configVersion, String evidence) {
-        screeningRecords.findByApplicationId(applicationId).ifPresent(record -> {
-            record.applyDecision(verdict.outcome(), verdict.reasonCode(), configVersion, evidence);
+    AppliedDecision applyDecision(String applicationId, MatchVerdict verdict, Integer configVersion,
+                                  String evidence, Integer samplingFrequency) {
+        return screeningRecords.findByApplicationId(applicationId).map(record -> {
+            boolean sampled = samplingFrequency != null && samplingFrequency > 0
+                    && record.getId() != null && record.getId() % samplingFrequency == 0;
+            ScreeningOutcome finalOutcome = sampled ? ScreeningOutcome.REVIEW : verdict.outcome();
+            String reasonCode = sampled ? "SCR_SAMPLED_FOR_REVIEW" : verdict.reasonCode();
+
+            record.applyDecision(verdict.outcome(), finalOutcome, reasonCode, configVersion, evidence);
             screeningRecords.save(record);
-        });
+            return new AppliedDecision(finalOutcome, reasonCode);
+        }).orElseGet(() -> new AppliedDecision(verdict.outcome(), verdict.reasonCode()));
     }
 
     @Transactional
