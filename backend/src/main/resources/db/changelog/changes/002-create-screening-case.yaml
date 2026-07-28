@@ -1,0 +1,355 @@
+databaseChangeLog:
+  - changeSet:
+      id: 002-create-screening-config
+      author: neo-04
+      comment: >
+        Versioned screening configuration snapshots. One row per immutable config version.
+      changes:
+        - createTable:
+            tableName: screening_config
+            columns:
+              - column:
+                  name: version
+                  type: INT
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: sampling_frequency
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: current_version
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: screening_config
+            indexName: idx_screening_config_current
+            columns:
+              - column:
+                  name: current_version
+      rollback:
+        - dropTable:
+            tableName: screening_config
+
+  - changeSet:
+      id: 002-create-watchlist-entry
+      author: neo-04
+      comment: Watchlist entries scoped by screening config version.
+      changes:
+        - createTable:
+            tableName: watchlist_entry
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: version
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: list_id
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: first_name
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: true
+              - column:
+                  name: last_name
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: true
+              - column:
+                  name: date_of_birth
+                  type: DATE
+                  constraints:
+                    nullable: true
+              - column:
+                  name: nationality
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: true
+              - column:
+                  name: list_type
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: true
+              - column:
+                  name: source
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: true
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: watchlist_entry
+            baseColumnNames: version
+            referencedTableName: screening_config
+            referencedColumnNames: version
+            constraintName: fk_watchlist_entry_version
+            onDelete: RESTRICT
+            onUpdate: RESTRICT
+        - createIndex:
+            tableName: watchlist_entry
+            indexName: idx_watchlist_entry_version
+            columns:
+              - column:
+                  name: version
+        - createIndex:
+            tableName: watchlist_entry
+            indexName: idx_watchlist_entry_list_id
+            columns:
+              - column:
+                  name: list_id
+      rollback:
+        - dropTable:
+            tableName: watchlist_entry
+
+  - changeSet:
+      id: 002-create-country-risk-entry
+      author: neo-04
+      comment: Country risk mappings scoped by screening config version.
+      changes:
+        - createTable:
+            tableName: country_risk_entry
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: version
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: country_code
+                  type: VARCHAR(3)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: country_name
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: risk_level
+                  type: VARCHAR(20)
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: country_risk_entry
+            baseColumnNames: version
+            referencedTableName: screening_config
+            referencedColumnNames: version
+            constraintName: fk_country_risk_entry_version
+            onDelete: RESTRICT
+            onUpdate: RESTRICT
+        - createIndex:
+            tableName: country_risk_entry
+            indexName: idx_country_risk_entry_version
+            columns:
+              - column:
+                  name: version
+        - addUniqueConstraint:
+            tableName: country_risk_entry
+            columnNames: version, country_code
+            constraintName: uk_country_risk_version_code
+      rollback:
+        - dropTable:
+            tableName: country_risk_entry
+
+  - changeSet:
+      id: 002-create-screening-record
+      author: neo-04
+      comment: >
+        One record per application screening. machine_outcome is the model result, final_outcome
+        is the effective result after manual override if present.
+      changes:
+        - createTable:
+            tableName: screening_record
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: application_id
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: machine_outcome
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: final_outcome
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: callback_status
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: processing_status
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: reason_code
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: true
+              - column:
+                  name: config_version
+                  type: INT
+                  constraints:
+                    nullable: true
+              - column:
+                  name: evidence
+                  type: TEXT
+                  constraints:
+                    nullable: true
+              - column:
+                  name: callback_time
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: true
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addUniqueConstraint:
+            tableName: screening_record
+            columnNames: application_id
+            constraintName: uk_screening_record_application_id
+        - addForeignKeyConstraint:
+            baseTableName: screening_record
+            baseColumnNames: config_version
+            referencedTableName: screening_config
+            referencedColumnNames: version
+            constraintName: fk_screening_record_config_version
+            onDelete: SET NULL
+            onUpdate: RESTRICT
+        - createIndex:
+            tableName: screening_record
+            indexName: idx_screening_record_config_version
+            columns:
+              - column:
+                  name: config_version
+        - createIndex:
+            tableName: screening_record
+            indexName: idx_screening_record_processing_status
+            columns:
+              - column:
+                  name: processing_status
+      rollback:
+        - dropTable:
+            tableName: screening_record
+
+  - changeSet:
+      id: 002-create-override-log
+      author: neo-04
+      comment: Audit trail for manual outcome overrides.
+      changes:
+        - createTable:
+            tableName: override_log
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: application_id
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: old_outcome
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: new_outcome
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: operator
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: reason
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: true
+              - column:
+                  name: override_time
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: override_log
+            baseColumnNames: application_id
+            referencedTableName: screening_record
+            referencedColumnNames: application_id
+            constraintName: fk_override_log_application_id
+            onDelete: CASCADE
+            onUpdate: RESTRICT
+        - createIndex:
+            tableName: override_log
+            indexName: idx_override_log_application_id
+            columns:
+              - column:
+                  name: application_id
+      rollback:
+        - dropTable:
+            tableName: override_log
