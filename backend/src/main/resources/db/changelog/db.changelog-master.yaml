@@ -10,3 +10,5 @@ databaseChangeLog:
       file: db/changelog/changes/003-drop-demo-showcase.yaml
   - include:
       file: db/changelog/changes/004-seed-high-risk-countries-v1.sql
+  - include:
+      file: db/changelog/changes/005-seed-watchlist-entries-v1.sql
