@@ -183,20 +183,6 @@ export default function ScreeningConfigScreen() {
     }
   }
 
-  async function remove(version) {
-    if (!window.confirm(`Delete version ${version}? This cannot be undone.`)) return;
-    setBusyVersion(version);
-    try {
-      await api.deleteScreeningConfig(version);
-      await refreshList();
-      setNotice({ tone: 'positive', text: `Version ${version} deleted.` });
-    } catch (e) {
-      setNotice({ tone: 'negative', text: e.message });
-    } finally {
-      setBusyVersion(null);
-    }
-  }
-
   async function openPreview(version) {
     try {
       setPreview(await api.getScreeningConfigVersion(version));
@@ -302,14 +288,6 @@ export default function ScreeningConfigScreen() {
                 onClick={() => activate(r.version)}
               >
                 Activate
-              </Button>
-              <Button
-                variant="danger"
-                size="sm"
-                busy={busyVersion === r.version}
-                onClick={() => remove(r.version)}
-              >
-                Delete
               </Button>
             </>
           )}
