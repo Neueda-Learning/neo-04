@@ -28,12 +28,24 @@ async function request(path, options = {}) {
   return res.json();
 }
 
-// This UI only ever READS. Applications arrive from the orchestrator — the real one, or the
-// sidecar playing it at http://localhost:9000 — never from a button in here. That is the
-// contract: your module is called, it does not call itself.
+// Applications arrive from the orchestrator — the real one, or the sidecar playing it at
+// http://localhost:9000 — never from a button in here. That is the contract: your module is
+// called, it does not call itself. Screening configuration is different: it is this module's
+// own reference data (the watchlist and country-risk lists), so the UI is allowed to write it.
 export const api = {
   health: () => request('/health'),
   info: () => request('/info'),
   listApplications: () => request('/api/v1/applications'),
   getApplication: (id) => request(`/api/v1/applications/${id}`),
+
+  // Screening configuration — insert-only, versioned. See docs/api-docs/screening-config-api-contract.md.
+  listScreeningConfigs: () => request('/api/v1/screening-configs'),
+  getCurrentScreeningConfig: () => request('/api/v1/screening-configs/current'),
+  getScreeningConfigVersion: (version) => request(`/api/v1/screening-configs/${version}`),
+  createScreeningConfig: (body) =>
+    request('/api/v1/screening-configs', { method: 'POST', body: JSON.stringify(body) }),
+  activateScreeningConfig: (version) =>
+    request(`/api/v1/screening-configs/${version}/activate`, { method: 'PUT' }),
+  deleteScreeningConfig: (version) =>
+    request(`/api/v1/screening-configs/${version}`, { method: 'DELETE' }),
 };

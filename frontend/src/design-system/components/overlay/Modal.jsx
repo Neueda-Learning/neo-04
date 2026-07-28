@@ -14,16 +14,24 @@ import { cx } from '../../internal/cx.js';
  */
 export function Modal({ open, title, onClose, footer, wide = false, className, children, ...rest }) {
   const panel = useRef(null);
+  // Callers almost always pass an inline `onClose`, a fresh function on every
+  // render of the parent — including every keystroke in a field inside this
+  // modal. A ref keeps the effect below from seeing that as a change: it should
+  // steal focus once, when the modal opens, not on every render of whoever owns it.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
 
   useEffect(() => {
     if (!open) return undefined;
     const onKey = (event) => {
-      if (event.key === 'Escape') onClose?.();
+      if (event.key === 'Escape') onCloseRef.current?.();
     };
     document.addEventListener('keydown', onKey);
     panel.current?.focus();
     return () => document.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
