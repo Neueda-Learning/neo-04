@@ -401,8 +401,8 @@ export default function ScreeningConfigScreen() {
               <>
                 <div>
                   <div style={{ display: 'flex', gap: 'var(--ds-space-2)', alignItems: 'center' }}>
-                    <Tag mono>v{current.version}</Tag>
                     <Badge tone="positive">Current</Badge>
+                    <Tag mono>Version {current.version}</Tag>
                   </div>
                   <Caption>
                     Sample every {current.samplingFrequency} · published {dateTime(current.createdAt)} by{' '}
