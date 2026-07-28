@@ -1,6 +1,6 @@
 package com.neobank.module.controller;
 
-import com.neobank.module.dto.DemoShowcaseView;
+import com.neobank.module.dto.ScreeningRecordView;
 import com.neobank.module.integrations.orchestrator.ApplicationRequest;
 import com.neobank.module.service.ApplicationService;
 import jakarta.validation.Valid;
@@ -83,7 +83,7 @@ public class ApplicationController {
      * orchestrator never calls it.
      */
     @GetMapping
-    public List<DemoShowcaseView> list() {
+    public List<ScreeningRecordView> list() {
         return applications.findAll();
     }
 }

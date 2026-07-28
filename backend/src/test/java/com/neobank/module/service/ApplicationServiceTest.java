@@ -3,42 +3,68 @@ package com.neobank.module.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.neobank.module.integrations.orchestrator.Application;
 import com.neobank.module.integrations.orchestrator.ApplicationRequest;
 import com.neobank.module.integrations.orchestrator.OrchestratorClient;
+import com.neobank.module.model.CountryRiskEntry;
 import com.neobank.module.model.Decision;
-import com.neobank.module.model.DemoShowcase;
-import com.neobank.module.repository.DemoShowcaseRepository;
+import com.neobank.module.model.RiskLevel;
+import com.neobank.module.model.ScreeningConfig;
+import com.neobank.module.model.ScreeningRecord;
+import com.neobank.module.model.WatchlistEntry;
+import com.neobank.module.repository.CountryRiskEntryRepository;
+import com.neobank.module.repository.ScreeningConfigRepository;
+import com.neobank.module.repository.ScreeningRecordRepository;
+import com.neobank.module.repository.WatchlistEntryRepository;
+import com.neobank.module.service.matching.ScreeningMatcher;
+import java.util.Optional;
+import java.util.concurrent.Executor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.dao.DataIntegrityViolationException;
 
 /**
- * The three things the placeholder does, and the guard that keeps a failure reportable.
+ * UC-00: exactly one row per {@code applicationId}, written before the executor ever runs, plus
+ * the guard that keeps a failure to open the case reportable rather than silently timing out.
  *
  * <p>No Spring, no database, no HTTP — the service takes a request and calls two collaborators, so
- * the test is a handful of lines. Keep it that way as you replace the body: logic that needs a
- * running container to test is logic you will stop testing.</p>
+ * the test is a handful of lines.</p>
  */
 class ApplicationServiceTest {
 
-    private DemoShowcaseRepository demoShowcase;
+    private ScreeningRecordRepository screeningRecords;
     private OrchestratorClient orchestrator;
-    private ApplicationService service;
+    private ScreeningConfigRepository screeningConfigs;
+    private WatchlistEntryRepository watchlistEntries;
+    private CountryRiskEntryRepository countryRiskEntries;
+    private ScreeningMatcher matcher;
+    private ObjectMapper json;
 
     @BeforeEach
     void setUp() {
-        demoShowcase = mock(DemoShowcaseRepository.class);
+        screeningRecords = mock(ScreeningRecordRepository.class);
         orchestrator = mock(OrchestratorClient.class);
-        // Runnable::run — the work happens inline, so there is nothing to wait for.
-        service = new ApplicationService(Runnable::run, demoShowcase, orchestrator);
-        when(demoShowcase.save(any(DemoShowcase.class))).thenAnswer(call -> call.getArgument(0));
+        screeningConfigs = mock(ScreeningConfigRepository.class);
+        watchlistEntries = mock(WatchlistEntryRepository.class);
+        countryRiskEntries = mock(CountryRiskEntryRepository.class);
+        matcher = new ScreeningMatcher();
+        json = new ObjectMapper();
+        when(screeningRecords.save(any(ScreeningRecord.class))).thenAnswer(call -> call.getArgument(0));
+        when(screeningConfigs.findCurrent()).thenReturn(Optional.empty());
+    }
+
+    private ApplicationService service() {
+        return new ApplicationService(Runnable::run, screeningRecords, orchestrator, screeningConfigs,
+                watchlistEntries, countryRiskEntries, matcher, json);
     }
 
     private static ApplicationRequest request(String id) {
@@ -53,35 +79,62 @@ class ApplicationServiceTest {
     }
 
     @Test
-    void storesTheApplicationAndReportsItAccepted() {
-        service.processApplication(request("SIM-01"));
+    void writesExactlyOneInProgressRowKeyedByApplicationId() {
+        ApplicationService service = service();
 
-        ArgumentCaptor<DemoShowcase> saved = ArgumentCaptor.forClass(DemoShowcase.class);
-        verify(demoShowcase).save(saved.capture());
+        service.processApplicationAsync(request("SIM-01"));
+
+        ArgumentCaptor<ScreeningRecord> saved = ArgumentCaptor.forClass(ScreeningRecord.class);
+        verify(screeningRecords).save(saved.capture());
         assertThat(saved.getValue().getApplicationId()).isEqualTo("SIM-01");
-        assertThat(saved.getValue().getStatus()).isEqualTo("ACCEPTED");
-
-        verify(orchestrator).applicationStatusUpdate("SIM-01", Decision.ACCEPTED,
-                "hello world from processApplication");
+        assertThat(saved.getValue().getMachineOutcome()).isEqualTo("PENDING");
+        assertThat(saved.getValue().getFinalOutcome()).isEqualTo("PENDING");
+        assertThat(saved.getValue().getProcessingStatus()).isEqualTo("IN_PROGRESS");
     }
 
     @Test
-    void theAsyncEntryPointDoesTheSameWorkThroughTheExecutor() {
+    void aRepeatedExecuteForTheSameIdIsANoOpNotASecondRow() {
+        when(screeningRecords.existsByApplicationId("SIM-02")).thenReturn(true);
+        ApplicationService service = service();
+
         service.processApplicationAsync(request("SIM-02"));
 
-        verify(demoShowcase).save(any(DemoShowcase.class));
-        verify(orchestrator).applicationStatusUpdate(eq("SIM-02"), eq(Decision.ACCEPTED), any());
+        verify(screeningRecords, never()).save(any(ScreeningRecord.class));
+        verifyNoInteractions(orchestrator);
     }
 
     @Test
-    void aFailureIsStillReportedRatherThanLeavingTheJourneyToTimeOut() {
-        // The failure mode this guard exists for: a module that throws never reports, and the
-        // orchestrator then waits out its 30s timeout and ends the journey FAILED with nothing to
-        // explain it. REFERRED with a reason is far more useful than silence.
-        doThrow(new IllegalStateException("database on fire"))
-                .when(demoShowcase).save(any(DemoShowcase.class));
+    void aRaceWithAConcurrentExecuteIsAbsorbedByTheUniqueConstraintGuard() {
+        when(screeningRecords.existsByApplicationId("SIM-05")).thenReturn(false);
+        when(screeningRecords.save(any(ScreeningRecord.class)))
+                .thenThrow(new DataIntegrityViolationException("uk_screening_record_application_id"));
+        ApplicationService service = service();
 
-        service.processApplication(request("SIM-03"));
+        service.processApplicationAsync(request("SIM-05"));
+
+        verifyNoInteractions(orchestrator);
+    }
+
+    @Test
+    void theRowIsWrittenOnTheCallingThreadNotTheExecutor() {
+        Executor neverRuns = task -> { /* the task is never invoked */ };
+        ApplicationService service = new ApplicationService(neverRuns, screeningRecords, orchestrator, screeningConfigs,
+                watchlistEntries, countryRiskEntries, matcher, json);
+
+        service.processApplicationAsync(request("SIM-06"));
+
+        // openCase happened before the (never-executing) executor was even handed anything.
+        verify(screeningRecords).save(any(ScreeningRecord.class));
+    }
+
+    @Test
+    void aFailureOpeningTheCaseIsStillReportedRatherThanLeavingTheJourneyToTimeOut() {
+        when(screeningRecords.existsByApplicationId("SIM-03")).thenReturn(false);
+        when(screeningRecords.save(any(ScreeningRecord.class)))
+                .thenThrow(new IllegalStateException("database on fire"));
+        ApplicationService service = service();
+
+        service.processApplicationAsync(request("SIM-03"));
 
         ArgumentCaptor<String> comment = ArgumentCaptor.forClass(String.class);
         verify(orchestrator).applicationStatusUpdate(eq("SIM-03"), eq(Decision.REFERRED),
@@ -91,15 +144,125 @@ class ApplicationServiceTest {
     }
 
     @Test
-    void theBoardShowsWhatWasStored() {
-        when(demoShowcase.findAllByOrderByCreatedAtDescIdDesc())
-                .thenReturn(java.util.List.of(new DemoShowcase("SIM-01", Decision.ACCEPTED)));
+    void theBoardShowsWhatWasOpened() {
+        when(screeningRecords.findAllByOrderByCreatedAtDescIdDesc())
+                .thenReturn(java.util.List.of(new ScreeningRecord("SIM-01")));
+        ApplicationService service = service();
 
         assertThat(service.findAll())
                 .singleElement()
                 .satisfies(view -> {
                     assertThat(view.applicationId()).isEqualTo("SIM-01");
-                    assertThat(view.status()).isEqualTo("ACCEPTED");
+                    assertThat(view.machineOutcome()).isEqualTo("PENDING");
+                    assertThat(view.processingStatus()).isEqualTo("IN_PROGRESS");
                 });
+    }
+
+    private static ApplicationRequest requestFor(String id, String fullName, String dateOfBirth, String countryOfResidence) {
+        Application application = new Application(
+                id, "MOBILE_APP", "2026-07-25T09:14:00Z",
+                new Application.Applicant(fullName, dateOfBirth, null, null, null, countryOfResidence,
+                        null, null, null, null, null),
+                null, null, null,
+                new Application.Product("CREDIT_CARD_REWARDS", 3000),
+                null, null);
+        return new ApplicationRequest(id, "corr-1", "process-application", application);
+    }
+
+    @Test
+    void anExactWatchlistMatchIsAnHitReportedAsRejected() {
+        when(screeningConfigs.findCurrent()).thenReturn(Optional.of(new ScreeningConfig(1, 7, true, "seed")));
+        when(watchlistEntries.findAllByVersionOrderByIdAsc(1)).thenReturn(java.util.List.of(
+                new WatchlistEntry(1, "WL-001", "Marek", "Nowak", java.time.LocalDate.of(1961, 4, 19),
+                        "PL", "SANCTIONS", "seed")));
+        ScreeningRecord row = new ScreeningRecord("SIM-10");
+        when(screeningRecords.findByApplicationId("SIM-10")).thenReturn(Optional.of(row));
+        ApplicationService service = service();
+
+        service.decide(requestFor("SIM-10", "Marek Nowak", "1961-04-19", null));
+
+        assertThat(row.getMachineOutcome()).isEqualTo("HIT");
+        assertThat(row.getReasonCode()).isEqualTo("SCR_EXACT_MATCH");
+        assertThat(row.getProcessingStatus()).isEqualTo("COMPLETE");
+        assertThat(row.getCallbackStatus()).isEqualTo("SENT");
+        verify(orchestrator).applicationStatusUpdate("SIM-10", Decision.REJECTED, "SCR_EXACT_MATCH");
+    }
+
+    @Test
+    void noMatchAndNoRiskIsClearReportedAsAccepted() {
+        ScreeningRecord row = new ScreeningRecord("SIM-11");
+        when(screeningRecords.findByApplicationId("SIM-11")).thenReturn(Optional.of(row));
+        ApplicationService service = service();
+
+        service.decide(requestFor("SIM-11", "Nobody Special", "1990-01-01", null));
+
+        assertThat(row.getMachineOutcome()).isEqualTo("CLEAR");
+        assertThat(row.getReasonCode()).isEqualTo("SCR_NO_MATCH");
+        verify(orchestrator).applicationStatusUpdate("SIM-11", Decision.ACCEPTED, "SCR_NO_MATCH");
+    }
+
+    @Test
+    void aPartialNameMatchWithMismatchedDobIsReviewReportedAsReferred() {
+        when(screeningConfigs.findCurrent()).thenReturn(Optional.of(new ScreeningConfig(1, 7, true, "seed")));
+        when(watchlistEntries.findAllByVersionOrderByIdAsc(1)).thenReturn(java.util.List.of(
+                new WatchlistEntry(1, "WL-003", "Amara", "Diallo", java.time.LocalDate.of(1969, 2, 10),
+                        null, "SANCTIONS", "seed")));
+        ScreeningRecord row = new ScreeningRecord("SIM-12");
+        when(screeningRecords.findByApplicationId("SIM-12")).thenReturn(Optional.of(row));
+        ApplicationService service = service();
+
+        service.decide(requestFor("SIM-12", "Amara Diallo", "1988-06-02", null));
+
+        assertThat(row.getMachineOutcome()).isEqualTo("REVIEW");
+        assertThat(row.getReasonCode()).isEqualTo("SCR_PARTIAL_MATCH");
+        verify(orchestrator).applicationStatusUpdate("SIM-12", Decision.REFERRED, "SCR_PARTIAL_MATCH");
+    }
+
+    @Test
+    void aHighRiskCountryOfResidenceIsReviewReportedAsReferred() {
+        when(screeningConfigs.findCurrent()).thenReturn(Optional.of(new ScreeningConfig(1, 7, true, "seed")));
+        when(countryRiskEntries.findAllByVersionOrderByIdAsc(1)).thenReturn(java.util.List.of(
+                new CountryRiskEntry(1, "BY", "Belarus", RiskLevel.HIGH)));
+        ScreeningRecord row = new ScreeningRecord("SIM-13");
+        when(screeningRecords.findByApplicationId("SIM-13")).thenReturn(Optional.of(row));
+        ApplicationService service = service();
+
+        service.decide(requestFor("SIM-13", "Elena Petrova", "1990-01-01", "BY"));
+
+        assertThat(row.getMachineOutcome()).isEqualTo("REVIEW");
+        assertThat(row.getReasonCode()).isEqualTo("SCR_HIGH_RISK_COUNTRY");
+        verify(orchestrator).applicationStatusUpdate("SIM-13", Decision.REFERRED, "SCR_HIGH_RISK_COUNTRY");
+    }
+
+    @Test
+    void anExactMatchWinsOverAHighRiskCountry() {
+        when(screeningConfigs.findCurrent()).thenReturn(Optional.of(new ScreeningConfig(1, 7, true, "seed")));
+        when(watchlistEntries.findAllByVersionOrderByIdAsc(1)).thenReturn(java.util.List.of(
+                new WatchlistEntry(1, "WL-001", "Marek", "Nowak", java.time.LocalDate.of(1961, 4, 19),
+                        "PL", "SANCTIONS", "seed")));
+        when(countryRiskEntries.findAllByVersionOrderByIdAsc(1)).thenReturn(java.util.List.of(
+                new CountryRiskEntry(1, "BY", "Belarus", RiskLevel.HIGH)));
+        ScreeningRecord row = new ScreeningRecord("SIM-14");
+        when(screeningRecords.findByApplicationId("SIM-14")).thenReturn(Optional.of(row));
+        ApplicationService service = service();
+
+        service.decide(requestFor("SIM-14", "Marek Nowak", "1961-04-19", "BY"));
+
+        assertThat(row.getMachineOutcome()).isEqualTo("HIT");
+        assertThat(row.getReasonCode()).isEqualTo("SCR_EXACT_MATCH");
+        verify(orchestrator).applicationStatusUpdate("SIM-14", Decision.REJECTED, "SCR_EXACT_MATCH");
+    }
+
+    @Test
+    void aFailureDecidingIsReportedAsReferredAndCallbackMarkedFailed() {
+        when(screeningConfigs.findCurrent()).thenThrow(new IllegalStateException("database on fire"));
+        ScreeningRecord row = new ScreeningRecord("SIM-15");
+        when(screeningRecords.findByApplicationId("SIM-15")).thenReturn(Optional.of(row));
+        ApplicationService service = service();
+
+        service.decide(requestFor("SIM-15", "Nobody Special", "1990-01-01", null));
+
+        verify(orchestrator).applicationStatusUpdate(eq("SIM-15"), eq(Decision.REFERRED), any());
+        assertThat(row.getCallbackStatus()).isEqualTo("FAILED");
     }
 }

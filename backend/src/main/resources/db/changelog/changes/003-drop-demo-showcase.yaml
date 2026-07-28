@@ -1,0 +1,46 @@
+# Replaces demo_showcase now that ScreeningRecord (screening_record, from 002) is this module's
+# real table. NEVER edit 001 or 002 once they have run — this is a new change set, per the rule in
+# db.changelog-master.yaml.
+databaseChangeLog:
+  - changeSet:
+      id: 003-drop-demo-showcase
+      author: neo-04
+      comment: >
+        demo_showcase was the template placeholder. UC-00 replaces it with screening_record
+        (see 002) — nothing references DemoShowcase any more, so the table goes too.
+      changes:
+        - dropTable:
+            tableName: demo_showcase
+      rollback:
+        - createTable:
+            tableName: demo_showcase
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: application_id
+                  type: VARCHAR(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: demo_showcase
+            indexName: idx_demo_showcase_application
+            columns:
+              - column:
+                  name: application_id
