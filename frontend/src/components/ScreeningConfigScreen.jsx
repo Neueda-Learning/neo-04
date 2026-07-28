@@ -14,7 +14,6 @@ import {
   PageHeader,
   Section,
   Select,
-  Split,
   Tag,
   TextInput,
 } from '../design-system';
@@ -83,6 +82,8 @@ export default function ScreeningConfigScreen() {
 
   const [preview, setPreview] = useState(null);
   const [busyVersion, setBusyVersion] = useState(null);
+  const [historyPage, setHistoryPage] = useState(1);
+  const HISTORY_PAGE_SIZE = 5;
 
   const resetDraftFrom = useCallback((detail) => {
     setDraftWatchlist(toDraftWatchlist(detail?.watchlistEntries));
@@ -128,6 +129,17 @@ export default function ScreeningConfigScreen() {
     });
     return baseline !== draft;
   }, [current, samplingFrequency, draftWatchlist, draftCountries]);
+
+  const historyTotalPages = Math.max(1, Math.ceil(configs.length / HISTORY_PAGE_SIZE));
+
+  useEffect(() => {
+    setHistoryPage((p) => Math.min(p, historyTotalPages));
+  }, [historyTotalPages]);
+
+  const historyRows = useMemo(
+    () => configs.slice((historyPage - 1) * HISTORY_PAGE_SIZE, historyPage * HISTORY_PAGE_SIZE),
+    [configs, historyPage]
+  );
 
   async function refreshList() {
     setConfigs(await api.listScreeningConfigs());
@@ -268,7 +280,7 @@ export default function ScreeningConfigScreen() {
       tight: true,
       render: (r) => (r.currentVersion ? <Badge tone="positive">Current</Badge> : <Tag>superseded</Tag>),
     },
-    { key: 'samplingFrequency', header: 'Sample every', numeric: true },
+    { key: 'samplingFrequency', header: 'Sample every' },
     { key: 'createdBy', header: 'Published by' },
     { key: 'createdAt', header: 'Published at', render: (r) => dateTime(r.createdAt) },
     {
@@ -320,22 +332,7 @@ export default function ScreeningConfigScreen() {
         </Alert>
       )}
 
-      <Split
-        ratio="wide-main"
-        sidebar={
-          <Card title="Version history" subtitle={`${configs.length} version${configs.length === 1 ? '' : 's'}`}>
-            <DataTable
-              columns={historyColumns}
-              rows={configs}
-              rowKey={(r) => r.version}
-              maxRows={null}
-              footnote="oldest supersedable, current always shown"
-              empty={<EmptyState title="No versions yet">Publish the first version from the panel on the left.</EmptyState>}
-            />
-            <Caption>Configuration is insert-only — nothing here is ever updated, only superseded.</Caption>
-          </Card>
-        }
-      >
+      <div>
         <Card
           title="Watchlist entries"
           subtitle={`${draftWatchlist.length} in this draft`}
@@ -421,7 +418,54 @@ export default function ScreeningConfigScreen() {
               : 'No changes yet — add or remove an entry above to build the next version.'}
           </Caption>
         </Card>
-      </Split>
+
+        <Card
+          title="Version history"
+          subtitle={`${configs.length} version${configs.length === 1 ? '' : 's'}`}
+          style={{ marginTop: 'var(--ds-space-6)' }}
+        >
+          <DataTable
+            columns={historyColumns}
+            rows={historyRows}
+            rowKey={(r) => r.version}
+            maxRows={null}
+            footnote="oldest supersedable, current always shown"
+            empty={<EmptyState title="No versions yet">Publish the first version above.</EmptyState>}
+          />
+          {historyTotalPages > 1 && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                gap: 'var(--ds-space-3)',
+                marginTop: 'var(--ds-space-2)',
+              }}
+            >
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={historyPage <= 1}
+                onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
+              >
+                Previous
+              </Button>
+              <Caption>
+                Page {historyPage} of {historyTotalPages}
+              </Caption>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={historyPage >= historyTotalPages}
+                onClick={() => setHistoryPage((p) => Math.min(historyTotalPages, p + 1))}
+              >
+                Next
+              </Button>
+            </div>
+          )}
+          <Caption>Configuration is insert-only — nothing here is ever updated, only superseded.</Caption>
+        </Card>
+      </div>
 
       <Modal
         open={watchlistModalOpen}
