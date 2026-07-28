@@ -1,0 +1,24 @@
+# screening_config.current_version: BOOLEAN -> TINYINT.
+#
+# WHY THIS EXISTS AS ITS OWN CHANGE SET. 002 originally declared this column BOOLEAN, which MySQL
+# stores as TINYINT(1) and Connector/J then reports as BIT — so Hibernate, mapping it to
+# `Byte currentVersion`, expects TINYINT and `ddl-auto: validate` refuses to start. The right
+# column type really is TINYINT. The fix was first made by editing 002 in place, and that is what
+# broke every deploy: Liquibase check-sums each change set once it has applied, so a database that
+# already ran 002 crash-loops on "check sum ... was 9:fe8ea349 but is now 9:eb54c77c". 002 has been
+# put back exactly as it applied, and the type change now lives here, where it can run once.
+#
+# Raw SQL rather than modifyDataType on purpose: Liquibase emits a bare `MODIFY col TYPE`, and
+# MySQL drops NOT NULL and DEFAULT from a column unless the MODIFY restates them.
+#
+# NEVER EDIT THIS FILE once it has run — add a new change set instead.
+databaseChangeLog:
+  - changeSet:
+      id: 006-alter-screening-config-current-version
+      author: neo-04
+      changes:
+        - sql:
+            sql: ALTER TABLE screening_config MODIFY COLUMN current_version TINYINT NOT NULL DEFAULT 0
+      rollback:
+        - sql:
+            sql: ALTER TABLE screening_config MODIFY COLUMN current_version BOOLEAN NOT NULL DEFAULT 0
