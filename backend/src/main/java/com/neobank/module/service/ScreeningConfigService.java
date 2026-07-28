@@ -121,23 +121,11 @@ public class ScreeningConfigService {
 
     @Transactional
     public void delete(Integer version) {
-        ScreeningConfig config = configs.findById(version)
-                .orElseThrow(() -> unknownVersion(version));
-
-        if (config.isCurrentVersion()) {
-            throw new IllegalStateException(
-                    "version " + version + " is the current version and cannot be deleted");
-        }
-
-        long usageCount = screeningRecords.countByConfigVersion(version);
-        if (usageCount > 0) {
-            throw new IllegalStateException(
-                    "version " + version + " is referenced by screening records and cannot be deleted");
-        }
-
-        watchlistEntries.deleteByVersion(version);
-        countryRiskEntries.deleteByVersion(version);
-        configs.delete(config);
+                if (!configs.existsById(version)) {
+                        throw unknownVersion(version);
+                }
+                throw new IllegalStateException(
+                                "screening config versions are immutable and cannot be deleted");
     }
 
     private ScreeningConfigDetailView toDetail(ScreeningConfig config) {

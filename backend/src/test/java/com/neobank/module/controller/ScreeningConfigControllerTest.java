@@ -116,11 +116,11 @@ class ScreeningConfigControllerTest {
 
         mvc.perform(delete("/api/v1/screening-configs/1"))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.message").value(containsString("cannot be deleted")));
+                .andExpect(jsonPath("$.message").value(containsString("immutable")));
     }
 
     @Test
-    void deleteReferencedVersionReturns409() throws Exception {
+        void deleteReferencedVersionReturns409() throws Exception {
         mvc.perform(post("/api/v1/screening-configs")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validCreatePayload(false)))
@@ -137,21 +137,19 @@ class ScreeningConfigControllerTest {
 
         mvc.perform(delete("/api/v1/screening-configs/1"))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.message").value(containsString("referenced by screening records")));
+                .andExpect(jsonPath("$.message").value(containsString("immutable")));
     }
 
     @Test
-    void deleteNonCurrentUnusedVersionReturns204() throws Exception {
+    void deleteNonCurrentUnusedVersionReturns409() throws Exception {
         mvc.perform(post("/api/v1/screening-configs")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validCreatePayload(false)))
                 .andExpect(status().isCreated());
 
         mvc.perform(delete("/api/v1/screening-configs/1"))
-                .andExpect(status().isNoContent());
-
-        mvc.perform(get("/api/v1/screening-configs/1"))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value(containsString("immutable")));
     }
 
     private String validCreatePayload(boolean activate) {
