@@ -84,7 +84,7 @@ public class ScreeningMatcher {
             }
         }
 
-        String applicantCountry = applicant == null ? null : applicant.nationality();
+        String applicantCountry = applicant == null ? null : applicant.countryOfResidence();
         boolean highRiskCountry = applicantCountry != null && countryRiskEntries.stream()
                 .anyMatch(risk -> risk.getRiskLevel() == RiskLevel.HIGH
                         && risk.getCountryCode().equalsIgnoreCase(applicantCountry));
