@@ -5,12 +5,18 @@ import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.neobank.module.dto.ScreeningRecordDetailView;
 import com.neobank.module.integrations.orchestrator.ApplicationRequest;
 import com.neobank.module.service.ApplicationService;
+import java.time.Instant;
+import java.util.NoSuchElementException;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -146,5 +152,46 @@ class ApplicationControllerTest {
         ArgumentCaptor<ApplicationRequest> sent = ArgumentCaptor.forClass(ApplicationRequest.class);
         verify(applications).processApplicationAsync(sent.capture());
         assertThat(sent.getValue().application().applicant().fullName()).isEqualTo("Maria Nowak");
+    }
+
+    @Test
+    void getReturnsTheDetailViewIncludingTheEvidencePanel() throws Exception {
+        // uc-02 AC1's contract shape: outcome, machineOutcome, config version, and matchResults
+        // (normalisedName, candidates[], countryRisk, sampling) as a real nested object.
+        ObjectMapper mapper = new ObjectMapper();
+        var evidence = mapper.readTree("""
+                {"normalisedName":"marek nowak",
+                 "candidates":[{"entryId":"WL-001","matchedFields":["fullName","dateOfBirth"],
+                                "rule":"exact","verdict":"hit","weight":1.0}],
+                 "countryRisk":{"highRisk":false,"countryCode":"PL"},
+                 "sampling":{"sampled":false,"position":null}}
+                """);
+        var detail = new ScreeningRecordDetailView("app-1355", "HIT", "HIT", "COMPLETE", "SENT",
+                "SCR_EXACT_MATCH", 1, evidence, Instant.parse("2026-07-21T21:40:00Z"),
+                Instant.parse("2026-07-21T21:40:03Z"));
+        when(applications.findOne("app-1355")).thenReturn(detail);
+
+        mvc.perform(get("/api/v1/applications/app-1355"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.applicationId").value("app-1355"))
+                .andExpect(jsonPath("$.machineOutcome").value("HIT"))
+                .andExpect(jsonPath("$.finalOutcome").value("HIT"))
+                .andExpect(jsonPath("$.reasonCode").value("SCR_EXACT_MATCH"))
+                .andExpect(jsonPath("$.configVersion").value(1))
+                .andExpect(jsonPath("$.evidence.normalisedName").value("marek nowak"))
+                .andExpect(jsonPath("$.evidence.candidates[0].entryId").value("WL-001"))
+                .andExpect(jsonPath("$.evidence.candidates[0].verdict").value("hit"))
+                .andExpect(jsonPath("$.evidence.countryRisk.highRisk").value(false))
+                .andExpect(jsonPath("$.evidence.sampling.sampled").value(false));
+    }
+
+    @Test
+    void getAnswers404ForAnUnknownApplicationId() throws Exception {
+        when(applications.findOne("app-9999")).thenThrow(new NoSuchElementException("no case for app-9999"));
+
+        mvc.perform(get("/api/v1/applications/app-9999"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.message").value(containsString("app-9999")));
     }
 }

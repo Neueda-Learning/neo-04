@@ -1,5 +1,6 @@
 package com.neobank.module.controller;
 
+import com.neobank.module.dto.ScreeningRecordDetailView;
 import com.neobank.module.dto.ScreeningRecordView;
 import com.neobank.module.integrations.orchestrator.ApplicationRequest;
 import com.neobank.module.service.ApplicationService;
@@ -10,6 +11,7 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -85,5 +87,16 @@ public class ApplicationController {
     @GetMapping
     public List<ScreeningRecordView> list() {
         return applications.findAll();
+    }
+
+    /**
+     * uc-02 · Review Alert's detail view: the outcome plus the evidence behind it (candidates
+     * considered, country risk, sampling). Read-only — the row was written once, off-thread, by
+     * the {@code POST} above; this never re-matches. An unknown id becomes {@code 404} via {@link
+     * GlobalExceptionHandler#handleNotFound}, not a silent empty body (uc-02 AC9).
+     */
+    @GetMapping("/{applicationId}")
+    public ScreeningRecordDetailView get(@PathVariable String applicationId) {
+        return applications.findOne(applicationId);
     }
 }

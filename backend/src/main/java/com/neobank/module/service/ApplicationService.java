@@ -2,6 +2,7 @@ package com.neobank.module.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.neobank.module.dto.ScreeningRecordDetailView;
 import com.neobank.module.dto.ScreeningRecordView;
 import com.neobank.module.integrations.orchestrator.Application;
 import com.neobank.module.integrations.orchestrator.ApplicationRequest;
@@ -18,9 +19,11 @@ import com.neobank.module.repository.ScreeningConfigRepository;
 import com.neobank.module.repository.ScreeningRecordRepository;
 import com.neobank.module.repository.WatchlistEntryRepository;
 import com.neobank.module.service.matching.MatchVerdict;
+import com.neobank.module.service.matching.SamplingEvidence;
 import com.neobank.module.service.matching.ScreeningMatcher;
 import java.time.Instant;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.concurrent.Executor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -140,9 +143,8 @@ public class ApplicationService {
             Integer samplingFrequency = config == null ? null : config.getSamplingFrequency();
 
             MatchVerdict verdict = matcher.match(applicant, watchlist, countryRisks);
-            String evidence = writeEvidence(verdict);
 
-            AppliedDecision applied = applyDecision(applicationId, verdict, configVersion, evidence, samplingFrequency);
+            AppliedDecision applied = applyDecision(applicationId, verdict, configVersion, samplingFrequency);
 
             Decision decision = toDecision(applied.finalOutcome());
             orchestrator.applicationStatusUpdate(applicationId, decision, applied.reasonCode());
@@ -170,15 +172,21 @@ public class ApplicationService {
      * case, is the sample position: it is unique and ordered by receipt with no extra counter or
      * race to manage. A {@code null} id only happens in a unit test that never persisted the row
      * for real — treated as "not sampled" rather than throwing.</p>
+     *
+     * <p>The sampling decision is made <em>before</em> the evidence is serialised, and folded into
+     * it via {@link MatchEvidence#withSampling} — so {@code matchResults.sampling} in the stored
+     * JSON always agrees with {@code reasonCode}/{@code finalOutcome}, never a step behind them.</p>
      */
     @Transactional
     AppliedDecision applyDecision(String applicationId, MatchVerdict verdict, Integer configVersion,
-                                  String evidence, Integer samplingFrequency) {
+                                  Integer samplingFrequency) {
         return screeningRecords.findByApplicationId(applicationId).map(record -> {
             boolean sampled = samplingFrequency != null && samplingFrequency > 0
                     && record.getId() != null && record.getId() % samplingFrequency == 0;
+            Long position = sampled ? record.getId() : null;
             ScreeningOutcome finalOutcome = sampled ? ScreeningOutcome.REVIEW : verdict.outcome();
             String reasonCode = sampled ? "SCR_SAMPLED_FOR_REVIEW" : verdict.reasonCode();
+            String evidence = writeEvidence(verdict, new SamplingEvidence(sampled, position));
 
             record.applyDecision(verdict.outcome(), finalOutcome, reasonCode, configVersion, evidence);
             screeningRecords.save(record);
@@ -194,9 +202,25 @@ public class ApplicationService {
         });
     }
 
-    private String writeEvidence(MatchVerdict verdict) {
+    /**
+     * uc-02 · Review Alert — the evidence panel behind one case, replayed from the row written by
+     * {@link #decide}. Read-only: this never re-matches, it only reads what was stored (uc-02's own
+     * sequence note — "reviewing an alert replays stored evidence... it never re-matches").
+     *
+     * @throws NoSuchElementException mapped to {@code 404} by {@link
+     *         com.neobank.module.controller.GlobalExceptionHandler#handleNotFound} — uc-02 AC9's
+     *         "unknown applicationId → 404 with a JSON error body".
+     */
+    @Transactional(readOnly = true)
+    public ScreeningRecordDetailView findOne(String applicationId) {
+        return screeningRecords.findByApplicationId(applicationId)
+                .map(row -> ScreeningRecordDetailView.of(row, json))
+                .orElseThrow(() -> new NoSuchElementException("no case for " + applicationId));
+    }
+
+    private String writeEvidence(MatchVerdict verdict, SamplingEvidence sampling) {
         try {
-            return json.writeValueAsString(verdict.evidence());
+            return json.writeValueAsString(verdict.evidence().withSampling(sampling));
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("could not serialise match evidence", e);
         }

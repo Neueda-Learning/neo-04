@@ -3,25 +3,33 @@
 //
 // The design system deliberately knows no business words (design-system/DESIGN.md § "Tones"):
 // ten modules speak ten vocabularies over one contract, and a Badge that knew "ACCEPTED" would
-// have to learn "VERIFIED", "CLEAR" and "SIGNED" too.
+// have to learn "VERIFIED", "CLEAR" and "SIGNED" too. This module's own vocabulary is "screening":
+// CLEAR · REVIEW · HIT (tones.js's own comment names it) — not the orchestrator's ACCEPTED /
+// REJECTED / REFERRED, which this module never stores or displays.
 import { TONES, toneMapper } from './design-system';
 
 export const statusTone = toneMapper({
-  ACCEPTED: TONES.POSITIVE,
-  REJECTED: TONES.NEGATIVE,
-  REFERRED: TONES.WARNING,
-  // Kept although the skeleton never stores it: a row is written only once the work is done. If
-  // you start recording an application before you have decided about it, this is already coloured.
-  'in-progress': TONES.INFO,
+  // finalOutcome / machineOutcome (ScreeningOutcome) — the screening verdict itself.
+  CLEAR: TONES.POSITIVE,
+  REVIEW: TONES.WARNING,
+  HIT: TONES.NEGATIVE,
+  // The row is opened before it is decided, so a fresh row briefly shows this — see decide().
+  PENDING: TONES.INFO,
+  // processingStatus (ProcessingStatus) — has the async decide() step finished yet.
+  IN_PROGRESS: TONES.INFO,
+  COMPLETE: TONES.NEUTRAL,
+  // callbackStatus (CallbackStatus) — has the orchestrator been told.
+  SENT: TONES.POSITIVE,
+  FAILED: TONES.NEGATIVE,
 });
 
 /**
- * The statuses the board filters on — the three a module can answer with.
- *
- * `in-progress` is not here on purpose: the placeholder writes its row after the work, so no row
- * is ever in that state and a chip for it would always read zero. Add it if you change that.
+ * The outcomes the board filters on. `PENDING` is included because a row genuinely sits there
+ * for the brief window between the `202` and the off-thread decide() completing — this module's
+ * decisions are not synchronous, unlike the placeholder it replaced.
  */
-export const STATUSES = ['ACCEPTED', 'REJECTED', 'REFERRED'];
+export const STATUSES = ['CLEAR', 'REVIEW', 'HIT', 'PENDING'];
+
 
 export function time(iso) {
   return iso ? new Date(iso).toLocaleTimeString() : '—';
