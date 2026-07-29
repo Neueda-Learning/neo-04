@@ -1,6 +1,7 @@
 package com.neobank.module.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -333,5 +334,64 @@ class ApplicationServiceTest {
         assertThat(row.getFinalOutcome()).isEqualTo("CLEAR");
         assertThat(row.getReasonCode()).isEqualTo("SCR_NO_MATCH");
         verify(orchestrator).applicationStatusUpdate("SIM-19", Decision.ACCEPTED, "SCR_NO_MATCH");
+    }
+
+    @Test
+    void evidenceJsonRecordsTheSamplingDecisionOnceKnown() throws Exception {
+        // uc-02 AC1/AC7 — matchResults.sampling must agree with what was actually reported, which
+        // only exists once the row's id (the sample position) is known.
+        when(screeningConfigs.findCurrent()).thenReturn(Optional.of(new ScreeningConfig(1, 7, true, "seed")));
+        ScreeningRecord row = new ScreeningRecord("SIM-20");
+        ReflectionTestUtils.setField(row, "id", 14L);
+        when(screeningRecords.findByApplicationId("SIM-20")).thenReturn(Optional.of(row));
+        ApplicationService service = service();
+
+        service.decide(requestFor("SIM-20", "Nobody Special", "1990-01-01", null));
+
+        var sampling = json.readTree(row.getEvidence()).get("sampling");
+        assertThat(sampling.get("sampled").asBoolean()).isTrue();
+        assertThat(sampling.get("position").asLong()).isEqualTo(14L);
+    }
+
+    @Test
+    void evidenceJsonRecordsNotSampledWhenOffTheBoundary() throws Exception {
+        when(screeningConfigs.findCurrent()).thenReturn(Optional.of(new ScreeningConfig(1, 7, true, "seed")));
+        ScreeningRecord row = new ScreeningRecord("SIM-21");
+        ReflectionTestUtils.setField(row, "id", 15L);
+        when(screeningRecords.findByApplicationId("SIM-21")).thenReturn(Optional.of(row));
+        ApplicationService service = service();
+
+        service.decide(requestFor("SIM-21", "Nobody Special", "1990-01-01", null));
+
+        var sampling = json.readTree(row.getEvidence()).get("sampling");
+        assertThat(sampling.get("sampled").asBoolean()).isFalse();
+        assertThat(sampling.get("position").isNull()).isTrue();
+    }
+
+    @Test
+    void findOneReturnsTheDetailViewWithParsedEvidence() {
+        ScreeningRecord row = new ScreeningRecord("SIM-22");
+        when(screeningRecords.findByApplicationId("SIM-22")).thenReturn(Optional.of(row));
+        ApplicationService service = service();
+        service.decide(requestFor("SIM-22", "Nobody Special", "1990-01-01", null));
+
+        var detail = service.findOne("SIM-22");
+
+        assertThat(detail.applicationId()).isEqualTo("SIM-22");
+        assertThat(detail.finalOutcome()).isEqualTo("CLEAR");
+        assertThat(detail.reasonCode()).isEqualTo("SCR_NO_MATCH");
+        // A real nested object, not a re-escaped string — see ScreeningRecordDetailView's javadoc.
+        assertThat(detail.evidence().get("normalisedName").asText()).isEqualTo("nobody special");
+        assertThat(detail.evidence().get("sampling").get("sampled").asBoolean()).isFalse();
+    }
+
+    @Test
+    void findOneThrowsForAnUnknownApplicationIdSoTheControllerCanAnswer404() {
+        when(screeningRecords.findByApplicationId("SIM-404")).thenReturn(Optional.empty());
+        ApplicationService service = service();
+
+        assertThatThrownBy(() -> service.findOne("SIM-404"))
+                .isInstanceOf(java.util.NoSuchElementException.class)
+                .hasMessageContaining("SIM-404");
     }
 }

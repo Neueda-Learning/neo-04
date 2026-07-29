@@ -7,20 +7,21 @@ import {
   EmptyState,
   Grid,
   MetricTile,
+  Modal,
   PageHeader,
   SearchInput,
   Toolbar,
 } from '../design-system';
 import { statusTone, STATUSES, time } from '../status.js';
+import AlertDetail from './AlertDetail.jsx';
 
 const FILTERS = ['All', ...STATUSES];
 
 /**
  * Everything this module has answered.
  *
- * ⚠️ Three columns, because the placeholder table behind it has three columns. When you replace
- * `demo_showcase` with your own table, this is the screen that shows it off — the operator UI is a
- * graded deliverable, so add the columns, filters and detail views your business topic needs.
+ * uc-02 · Review Alert: a row opens {@link AlertDetail} in a modal, showing the evidence behind
+ * the outcome (candidates considered, country risk, sampling) — read-only, never re-matched.
  *
  * The board follows the platform shape (design-system/DESIGN.md § "Board"): a header stating the
  * screen's rules, a toolbar that narrows, a capped table. The 10-row cap and its footnote come from
@@ -29,11 +30,12 @@ const FILTERS = ['All', ...STATUSES];
 export default function RequestsScreen({ requests, error, info }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('All');
+  const [openId, setOpenId] = useState(null);
 
   const counts = useMemo(
     () =>
       requests.reduce((acc, r) => {
-        acc[r.status] = (acc[r.status] ?? 0) + 1;
+        acc[r.finalOutcome] = (acc[r.finalOutcome] ?? 0) + 1;
         return acc;
       }, {}),
     [requests]
@@ -42,7 +44,7 @@ export default function RequestsScreen({ requests, error, info }) {
   const matches = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return requests.filter((r) => {
-      if (filter !== 'All' && r.status !== filter) return false;
+      if (filter !== 'All' && r.finalOutcome !== filter) return false;
       if (!needle) return true;
       return r.applicationId.toLowerCase().includes(needle);
     });
@@ -51,13 +53,14 @@ export default function RequestsScreen({ requests, error, info }) {
   const columns = [
     { key: 'applicationId', header: 'Application', mono: true },
     {
-      key: 'status',
-      header: 'Status',
+      key: 'finalOutcome',
+      header: 'Outcome',
       tight: true,
-      render: (r) => <Badge tone={statusTone(r.status)}>{r.status}</Badge>,
+      render: (r) => <Badge tone={statusTone(r.finalOutcome)}>{r.finalOutcome}</Badge>,
     },
     { key: 'createdAt', header: 'Answered', render: (r) => time(r.createdAt) },
   ];
+
 
   return (
     <>
@@ -82,7 +85,7 @@ export default function RequestsScreen({ requests, error, info }) {
 
       <Grid cols={2} min={180} style={{ marginBottom: 'var(--ds-space-6)' }}>
         <MetricTile label="Seen" value={requests.length} />
-        <MetricTile label="Accepted" value={counts.ACCEPTED ?? 0} tone="positive" />
+        <MetricTile label="Clear" value={counts.CLEAR ?? 0} tone="positive" />
       </Grid>
 
       <Toolbar>
@@ -101,6 +104,7 @@ export default function RequestsScreen({ requests, error, info }) {
         rows={matches}
         total={matches.length}
         rowKey={(r) => r.applicationId}
+        onRowClick={(r) => setOpenId(r.applicationId)}
         footnote="newest first"
         empty={
           <EmptyState
@@ -118,6 +122,15 @@ export default function RequestsScreen({ requests, error, info }) {
           </EmptyState>
         }
       />
+
+      <Modal
+        open={openId != null}
+        title="Case detail"
+        wide
+        onClose={() => setOpenId(null)}
+      >
+        {openId != null && <AlertDetail applicationId={openId} />}
+      </Modal>
     </>
   );
 }
