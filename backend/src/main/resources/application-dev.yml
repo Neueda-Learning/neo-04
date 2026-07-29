@@ -1,6 +1,0 @@
-spring:
-  liquibase:
-    # In development, changesets are sometimes edited after execution. This clears the
-    # mismatched checksums so Liquibase re-runs them rather than failing on startup.
-    # NEVER set this in production — applied changesets must never be edited there.
-    clear-checksums: true
