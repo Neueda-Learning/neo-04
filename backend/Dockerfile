@@ -20,6 +20,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl \
 COPY --from=build /app/target/*.jar app.jar
 EXPOSE 8080
 # Verified on Saturday, 2026-07-25 — pipeline flow check (README is paths-ignored on its own).
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-jar", "app.jar", "--spring.profiles.active=${SPRING_PROFILES_ACTIVE:-dev}"]
 
 # flow-test b01: exercise branch → PR → merge(dev) → promote(prod).

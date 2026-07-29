@@ -13,6 +13,7 @@ import java.time.Instant;
  */
 public record ScreeningRecordView(
         String applicationId,
+        String status,
         String machineOutcome,
         String finalOutcome,
         String processingStatus,
@@ -23,11 +24,21 @@ public record ScreeningRecordView(
     public static ScreeningRecordView of(ScreeningRecord row) {
         return new ScreeningRecordView(
                 row.getApplicationId(),
+                outcomeToDecision(row.getFinalOutcome()),
                 row.getMachineOutcome(),
                 row.getFinalOutcome(),
                 row.getProcessingStatus(),
                 row.getCallbackStatus(),
                 row.getCreatedAt(),
                 row.getUpdatedAt());
+    }
+
+    private static String outcomeToDecision(String screeningOutcome) {
+        return switch (screeningOutcome) {
+            case "HIT" -> "REJECTED";
+            case "REVIEW" -> "REFERRED";
+            case "CLEAR", "PENDING" -> "ACCEPTED";
+            default -> "ACCEPTED";
+        };
     }
 }

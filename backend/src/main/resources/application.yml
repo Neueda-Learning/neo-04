@@ -39,6 +39,10 @@ spring:
 
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.yaml
+    # Clear invalid checksums automatically in dev — changesets that have been edited after
+    # execution will have mismatched checksums. Production never edits applied changesets, but
+    # development does: this flag prevents the launch from failing on a checksum mismatch.
+    clear-checksums: ${LIQUIBASE_CLEAR_CHECKSUMS:false}
 
   # The pool the decision runs on — Spring Boot's own `applicationTaskExecutor`, so there is no
   # bean to write. The thread-name prefix is what proves, in the logs, that your rules did NOT
@@ -103,3 +107,4 @@ springdoc:
 logging:
   level:
     liquibase: INFO
+    com.neobank.module.service.matching: DEBUG

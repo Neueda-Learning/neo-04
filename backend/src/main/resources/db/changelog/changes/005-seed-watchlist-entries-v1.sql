@@ -4,9 +4,9 @@
 --comment Seed 100 sample watchlist entries for screening demo/testing.
 INSERT INTO watchlist_entry (version, list_id, first_name, last_name, date_of_birth, nationality, list_type, source)
 VALUES
-  (1, 'WL-001', 'AHMED', 'AL-QAEDA', '1965-03-15', 'SA', 'TERRORIST', 'UN_SANCTIONS'),
-  (1, 'WL-002', 'hassan', 'nasrallah', '1960-08-31', 'LB', 'TERRORIST', 'US_TREASURY'),
-  (1, 'WL-003', 'Masoud', 'Rajavi', '1948-12-08', 'IR', 'TERRORIST', 'EU_SANCTIONS'),
+  (1, 'WL-001', 'Marek ', 'Nowak', '1961-04-19', 'SA', 'SANCTIONED', 'UN_SANCTIONS'),
+  (1, 'WL-002', 'Viktor', 'Petrov', '1975-08-22', 'LB', 'SANCTIONED', 'US_TREASURY'),
+  (1, 'WL-003', 'Amara', 'Diallo', '1969-02-10', 'IR', 'SANCTIONED', 'EU_SANCTIONS'),
   (1, 'WL-004', 'AYMAN', 'al-zawahiri', '1951-06-19', 'EG', 'TERRORIST', 'UN_SANCTIONS'),
   (1, 'WL-005', 'Khalid', 'sheikh-mohammed', '1964-04-14', 'KW', 'TERRORIST', 'US_FBI'),
   (1, 'WL-006', 'MOHAMMED', 'Atef', '1944-11-21', 'EG', 'TERRORIST', 'US_TREASURY'),
@@ -28,7 +28,7 @@ VALUES
   (1, 'WL-022', 'Ali', 'khameini', '1939-04-15', 'IR', 'POLITICAL', 'STATE_DEPT'),
   (1, 'WL-023', 'ABDEL FATTAH', 'al-sisi', '1954-11-19', 'EG', 'POLITICAL', 'STATE_DEPT'),
   (1, 'WL-024', 'recep', 'ERDOĞAN', '1954-02-26', 'TR', 'POLITICAL', 'STATE_DEPT'),
-  (1, 'WL-025', 'XI', 'jinping', '1953-06-15', 'CN', 'POLITICAL', 'STATE_DEPT'),
+  (1, 'WL-025', 'DUO', 'LINGGUO', '1953-06-15', 'CN', 'POLITICAL', 'STATE_DEPT'),
   (1, 'WL-026', 'mohammed', 'BIN-SALMAN', '1985-09-05', 'SA', 'POLITICAL', 'STATE_DEPT'),
   (1, 'WL-027', 'Prabowo', 'subianto', '1951-10-17', 'ID', 'POLITICAL', 'INTERPOL'),
   (1, 'WL-028', 'DMITRY', 'rogozin', '1963-12-21', 'RU', 'SANCTIONED', 'EU_SANCTIONS'),
