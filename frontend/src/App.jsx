@@ -8,6 +8,17 @@ import { api } from './api.js';
 const POLL_MS = 2000;
 const HEALTH_MS = 10000;
 
+function getInitialScreen() {
+  const screen = new URLSearchParams(window.location.search).get('screen');
+  return screen === 'cases' || screen === 'screening-config' ? screen : 'applications';
+}
+
+function getInitialScreeningConfigMode() {
+  return new URLSearchParams(window.location.search).get('screeningConfigMode') === 'edit'
+    ? 'edit'
+    : 'history';
+}
+
 /**
  * The screens in the side menu.
  *
@@ -18,7 +29,7 @@ const HEALTH_MS = 10000;
  */
 const SCREENS = [
   { id: 'applications', label: 'Applications' },
-  { id: 'cases', label: 'Cases' },
+  { id: 'cases', label: 'Cases', hint: 'your own table' },
   { id: 'overrides', label: 'Overrides', hint: 'operator actions', disabled: true },
   { id: 'screening-config', label: 'Screening config', hint: 'watchlist · country risk · history' },
 ];
@@ -30,7 +41,8 @@ const SCREENS = [
  * "Team 07" once SERVICE_TEAM says so.
  */
 export default function App() {
-  const [screen, setScreen] = useState('applications');
+  const [screen, setScreen] = useState(getInitialScreen);
+  const [screeningConfigMode, setScreeningConfigMode] = useState(getInitialScreeningConfigMode);
   const [requests, setRequests] = useState([]);
   const [error, setError] = useState(null);
   const [health, setHealth] = useState(null);
@@ -68,17 +80,24 @@ export default function App() {
   }, [refreshHealth]);
 
   const up = !error && health?.status === 'UP';
-
-  return (
-    <AppShell
-      side={
+  const side =
+    screeningConfigMode === 'edit'
+      ? null
+      : (
         <>
           <SideBrand
             brand={info?.team ?? 'Team'}
             product={info?.service ?? 'Module'}
             meta={info ? `${info.serviceId} · ${info.domain}` : undefined}
           />
-          <SideNav items={SCREENS} active={screen} onSelect={setScreen} />
+          <SideNav
+            items={SCREENS}
+            active={screen}
+            onSelect={(next) => {
+              setScreen(next);
+              if (next !== 'screening-config') setScreeningConfigMode('history');
+            }}
+          />
           {/* Health and refresh lived in the top bar; with the bar gone they belong beside the
               menu rather than inside it — a menu item that is not a screen is a trap. */}
           <div className="app-side-status">
@@ -95,14 +114,23 @@ export default function App() {
             </Button>
           </div>
         </>
-      }
+      );
+
+  return (
+    <AppShell
+      side={side}
       footer="One of ten modules · applications arrive from the orchestrator, never from this UI"
     >
       {screen === 'applications' && (
         <RequestsScreen requests={requests} error={error} info={info} />
       )}
       {screen === 'cases' && <CasesScreen />}
-      {screen === 'screening-config' && <ScreeningConfigScreen />}
+      {screen === 'screening-config' && (
+        <ScreeningConfigScreen
+          mode={screeningConfigMode}
+          onModeChange={(nextMode) => setScreeningConfigMode(nextMode)}
+        />
+      )}
     </AppShell>
   );
 }

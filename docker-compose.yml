@@ -71,7 +71,26 @@ services:
   # Do not replace this with a local path or a vendored copy. One repo, one copy — that is what
   # stops ten teams ending up with ten different mock orchestrators.
   sidecar:
-    build: https://github.com/Neueda-Learning/neobank-sidecar.git#${SIDECAR_REF:-v1}
+    build:
+      context: https://github.com/Neueda-Learning/neobank-sidecar.git#${SIDECAR_REF:-v1}
+      dockerfile_inline: |
+        # syntax=docker/dockerfile:1
+        FROM eclipse-temurin:21-jdk-jammy AS build
+        WORKDIR /app
+        COPY .mvn/ .mvn/
+        COPY mvnw pom.xml ./
+        COPY src/ src/
+        RUN sed -i 's/\r$//' mvnw && chmod +x mvnw
+        RUN --mount=type=cache,target=/root/.m2,sharing=locked \
+            ./mvnw -B -q clean package -DskipTests
+
+        FROM eclipse-temurin:21-jre-jammy AS runtime
+        WORKDIR /app
+        RUN apt-get update && apt-get install -y --no-install-recommends curl \
+            && rm -rf /var/lib/apt/lists/*
+        COPY --from=build /app/target/*.jar app.jar
+        EXPOSE 8080
+        ENTRYPOINT ["java", "-jar", "/app/app.jar"]
     environment:
       DB_URL: jdbc:mysql://mysql:3306/sidecar_db
       DB_USERNAME: ${DB_USERNAME:-appuser}
