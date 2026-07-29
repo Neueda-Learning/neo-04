@@ -37,6 +37,7 @@ export const api = {
   info: () => request('/info'),
   listApplications: () => request('/api/v1/applications'),
   getApplication: (id) => request(`/api/v1/applications/${id}`),
+  searchCases: (q, limit = 10) => request(`/api/v1/cases?q=${encodeURIComponent(q)}&limit=${limit}`),
 
   // Screening configuration — insert-only, versioned. See docs/api-docs/screening-config-api-contract.md.
   listScreeningConfigs: () => request('/api/v1/screening-configs'),

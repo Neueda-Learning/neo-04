@@ -4,6 +4,7 @@ import com.neobank.module.model.ScreeningRecord;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 
 /**
  * One row per {@code applicationId} — {@link #existsByApplicationId} is what makes UC-00's
@@ -27,4 +28,16 @@ public interface ScreeningRecordRepository extends JpaRepository<ScreeningRecord
      * still pinned by at least one alert's {@code config_version}.
      */
     long countByConfigVersion(Integer configVersion);
+
+    /**
+     * uc-01: Search by application ID (partial match, case-insensitive).
+     * Used for case board ID search.
+     */
+    List<ScreeningRecord> findByApplicationIdContainingIgnoreCaseOrderByCreatedAtDesc(String applicationId);
+
+    /**
+     * uc-01: Fetch cases by a list of application IDs (resolved from orchestrator name search).
+     * Ordered newest first.
+     */
+    List<ScreeningRecord> findByApplicationIdInOrderByCreatedAtDesc(List<String> applicationIds);
 }
