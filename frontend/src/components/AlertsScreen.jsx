@@ -7,45 +7,52 @@ import {
   EmptyState,
   Grid,
   MetricTile,
+  Modal,
   PageHeader,
   SearchInput,
   Toolbar,
 } from '../design-system';
-import { statusTone, STATUSES, time } from '../status.js';
+import { statusTone, time } from '../status.js';
+import AlertDetail from './AlertDetail.jsx';
 
-const FILTERS = ['All', ...STATUSES];
+const ALERT_OUTCOMES = ['HIT', 'REVIEW'];
+const FILTERS = ['All', ...ALERT_OUTCOMES];
 
 /**
- * Everything this module has answered.
+ * Alerts needing a human look: every application this module answered HIT or REVIEW.
+ * CLEAR/PENDING applications never appear here — see the Applications screen for the full board.
  *
- * A plain read-only board — no row detail here. HIT/REVIEW applications get their evidence
- * (uc-02 · Review Alert) on the Alert screen instead; this screen just shows what came in.
- *
- * The board follows the platform shape (design-system/DESIGN.md § "Board"): a header stating the
- * screen's rules, a toolbar that narrows, a capped table. The 10-row cap and its footnote come from
- * DataTable — no screen re-implements them.
+ * uc-02 · Review Alert: a row opens {@link AlertDetail} in a modal, showing the evidence behind
+ * the outcome (candidates considered, country risk, sampling) — read-only, never re-matched.
+ * The Applications board itself no longer opens this detail — it lives here only.
  */
-export default function RequestsScreen({ requests, error, info }) {
+export default function AlertsScreen({ requests, error }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('All');
+  const [openId, setOpenId] = useState(null);
+
+  const alerts = useMemo(
+    () => requests.filter((r) => ALERT_OUTCOMES.includes(r.finalOutcome)),
+    [requests]
+  );
 
   const counts = useMemo(
     () =>
-      requests.reduce((acc, r) => {
+      alerts.reduce((acc, r) => {
         acc[r.finalOutcome] = (acc[r.finalOutcome] ?? 0) + 1;
         return acc;
       }, {}),
-    [requests]
+    [alerts]
   );
 
   const matches = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    return requests.filter((r) => {
+    return alerts.filter((r) => {
       if (filter !== 'All' && r.finalOutcome !== filter) return false;
       if (!needle) return true;
       return r.applicationId.toLowerCase().includes(needle);
     });
-  }, [requests, query, filter]);
+  }, [alerts, query, filter]);
 
   const columns = [
     { key: 'applicationId', header: 'Application', mono: true },
@@ -58,20 +65,11 @@ export default function RequestsScreen({ requests, error, info }) {
     { key: 'createdAt', header: 'Answered', render: (r) => time(r.createdAt) },
   ];
 
-
   return (
     <>
       <PageHeader
-        title="Applications"
-        lede="everything the orchestrator has sent this module, and what it answered · newest first"
-        meta={
-          info
-            ? `${info.serviceId} · ${info.domain} · v${info.version}` +
-              (info.mockedDependencies?.length
-                ? ` · mocking ${info.mockedDependencies.join(', ')}`
-                : ' · nothing mocked')
-            : undefined
-        }
+        title="Alert"
+        lede="applications this module flagged HIT or REVIEW · click a row for the evidence behind it"
       />
 
       {error && (
@@ -81,8 +79,8 @@ export default function RequestsScreen({ requests, error, info }) {
       )}
 
       <Grid cols={2} min={180} style={{ marginBottom: 'var(--ds-space-6)' }}>
-        <MetricTile label="Seen" value={requests.length} />
-        <MetricTile label="Clear" value={counts.CLEAR ?? 0} tone="positive" />
+        <MetricTile label="Hit" value={counts.HIT ?? 0} tone="negative" />
+        <MetricTile label="Review" value={counts.REVIEW ?? 0} tone="warning" />
       </Grid>
 
       <Toolbar>
@@ -91,7 +89,7 @@ export default function RequestsScreen({ requests, error, info }) {
           placeholder="Application id"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          aria-label="Search applications"
+          aria-label="Search alerts"
         />
         <ChipGroup options={FILTERS} value={filter} onChange={setFilter} counts={counts} />
       </Toolbar>
@@ -101,23 +99,22 @@ export default function RequestsScreen({ requests, error, info }) {
         rows={matches}
         total={matches.length}
         rowKey={(r) => r.applicationId}
+        onRowClick={(r) => setOpenId(r.applicationId)}
         footnote="newest first"
         empty={
-          <EmptyState
-            title={requests.length === 0 ? 'Nothing received yet' : 'No application matches that'}
-          >
-            {requests.length === 0 ? (
-              <>
-                Send one from the <strong>sidecar</strong> at <strong>localhost:9000</strong>, or turn
-                the generator on in the orchestrator UI. Nothing in this screen sends applications —
-                this module is called, it does not call itself.
-              </>
+          <EmptyState title={alerts.length === 0 ? 'No alerts yet' : 'No alert matches that'}>
+            {alerts.length === 0 ? (
+              <>Nothing has been flagged HIT or REVIEW — every application so far cleared.</>
             ) : (
-              <>Clear the search, or pick a different status.</>
+              <>Clear the search, or pick a different outcome.</>
             )}
           </EmptyState>
         }
       />
+
+      <Modal open={openId != null} title="Case detail" wide onClose={() => setOpenId(null)}>
+        {openId != null && <AlertDetail applicationId={openId} />}
+      </Modal>
     </>
   );
 }
