@@ -3,6 +3,8 @@ import { AppShell, Button, SideBrand, SideNav, StatusPill } from './design-syste
 import RequestsScreen from './components/RequestsScreen.jsx';
 import AlertsScreen from './components/AlertsScreen.jsx';
 import ScreeningConfigScreen from './components/ScreeningConfigScreen.jsx';
+import AnalystQueueScreen from './components/AnalystQueueScreen.jsx';
+import OverridesScreen from './components/OverridesScreen.jsx';
 import { api } from './api.js';
 
 const POLL_MS = 2000;
@@ -10,7 +12,9 @@ const HEALTH_MS = 10000;
 
 function getInitialScreen() {
   const screen = new URLSearchParams(window.location.search).get('screen');
-  return screen === 'cases' || screen === 'screening-config' ? screen : 'applications';
+  return ['alerts', 'queue', 'overrides', 'screening-config'].includes(screen)
+    ? screen
+    : 'applications';
 }
 
 function getInitialScreeningConfigMode() {
@@ -30,7 +34,8 @@ function getInitialScreeningConfigMode() {
 const SCREENS = [
   { id: 'applications', label: 'Applications' },
   { id: 'alerts', label: 'Alert', hint: 'HIT · REVIEW' },
-  { id: 'overrides', label: 'Overrides', hint: 'operator actions', disabled: true },
+  { id: 'queue', label: 'Analyst queue', hint: 'claim · decide' },
+  { id: 'overrides', label: 'Overrides', hint: 'operator actions' },
   { id: 'screening-config', label: 'Screening config', hint: 'watchlist · country risk · history' },
 ];
 
@@ -125,6 +130,10 @@ export default function App() {
         <RequestsScreen requests={requests} error={error} info={info} />
       )}
       {screen === 'alerts' && <AlertsScreen requests={requests} error={error} />}
+      {screen === 'queue' && <AnalystQueueScreen onCaseChanged={reload} />}
+      {screen === 'overrides' && (
+        <OverridesScreen requests={requests} error={error} onCaseChanged={reload} />
+      )}
       {screen === 'screening-config' && (
         <ScreeningConfigScreen
           mode={screeningConfigMode}

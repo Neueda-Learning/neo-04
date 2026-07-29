@@ -1,6 +1,8 @@
 package com.neobank.module.service;
 
 import com.neobank.module.dto.CaseSearchView;
+import com.neobank.module.dto.ApplicantView;
+import com.neobank.module.integrations.orchestrator.OrchestratorApplicationClient;
 import com.neobank.module.integrations.orchestrator.OrchestratorApplicationSearchClient;
 import com.neobank.module.repository.ScreeningRecordRepository;
 import java.util.List;
@@ -24,11 +26,14 @@ public class CasesService {
 
     private final ScreeningRecordRepository cases;
     private final OrchestratorApplicationSearchClient orchestrator;
+    private final OrchestratorApplicationClient applicationClient;
 
     public CasesService(ScreeningRecordRepository cases,
-                        OrchestratorApplicationSearchClient orchestrator) {
+                        OrchestratorApplicationSearchClient orchestrator,
+                        OrchestratorApplicationClient applicationClient) {
         this.cases = cases;
         this.orchestrator = orchestrator;
+        this.applicationClient = applicationClient;
     }
 
     /**
@@ -79,5 +84,10 @@ public class CasesService {
                 return List.of();
             }
         }
+    }
+
+    /** Fetches applicant data from its owner on every request; this path performs no database write. */
+    public ApplicantView getApplicant(String applicationId) {
+        return ApplicantView.of(applicationClient.findById(applicationId));
     }
 }

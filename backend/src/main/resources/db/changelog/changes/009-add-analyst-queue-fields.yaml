@@ -1,0 +1,59 @@
+databaseChangeLog:
+  - changeSet:
+      id: 009-add-analyst-queue-fields
+      author: neo-04
+      comment: Add claim and immutable analyst resolution fields for UC-04.
+      changes:
+        - addColumn:
+            tableName: screening_record
+            columns:
+              - column:
+                  name: claimed_by
+                  type: VARCHAR(100)
+              - column:
+                  name: claimed_at
+                  type: TIMESTAMP
+              - column:
+                  name: resolved_by
+                  type: VARCHAR(100)
+              - column:
+                  name: resolved_at
+                  type: TIMESTAMP
+              - column:
+                  name: resolution
+                  type: VARCHAR(20)
+              - column:
+                  name: resolution_reason
+                  type: VARCHAR(500)
+        - createIndex:
+            tableName: screening_record
+            indexName: idx_screening_record_analyst_queue
+            columns:
+              - column:
+                  name: final_outcome
+              - column:
+                  name: claimed_by
+              - column:
+                  name: created_at
+      rollback:
+        - dropIndex:
+            tableName: screening_record
+            indexName: idx_screening_record_analyst_queue
+        - dropColumn:
+            tableName: screening_record
+            columnName: resolution_reason
+        - dropColumn:
+            tableName: screening_record
+            columnName: resolution
+        - dropColumn:
+            tableName: screening_record
+            columnName: resolved_at
+        - dropColumn:
+            tableName: screening_record
+            columnName: resolved_by
+        - dropColumn:
+            tableName: screening_record
+            columnName: claimed_at
+        - dropColumn:
+            tableName: screening_record
+            columnName: claimed_by

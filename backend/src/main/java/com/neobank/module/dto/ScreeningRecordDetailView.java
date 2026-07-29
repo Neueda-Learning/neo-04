@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.neobank.module.model.ScreeningRecord;
 import java.time.Instant;
+import java.util.List;
 
 /**
  * What {@code GET /api/v1/applications/{applicationId}} returns — uc-02's "why" behind the
@@ -23,6 +24,13 @@ public record ScreeningRecordDetailView(
         String reasonCode,
         Integer configVersion,
         JsonNode evidence,
+        String claimedBy,
+        Instant claimedAt,
+        String resolvedBy,
+        Instant resolvedAt,
+        String resolution,
+        String resolutionReason,
+        List<OverrideLogView> overrides,
         Instant createdAt,
         Instant updatedAt) {
 
@@ -36,6 +44,13 @@ public record ScreeningRecordDetailView(
                 row.getReasonCode(),
                 row.getConfigVersion(),
                 parseEvidence(row.getEvidence(), json),
+                row.getClaimedBy(),
+                row.getClaimedAt(),
+                row.getResolvedBy(),
+                row.getResolvedAt(),
+                row.getResolution(),
+                row.getResolutionReason(),
+                row.getOverrideLogs().stream().map(OverrideLogView::of).toList(),
                 row.getCreatedAt(),
                 row.getUpdatedAt());
     }

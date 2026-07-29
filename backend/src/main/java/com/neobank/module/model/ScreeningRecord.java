@@ -6,10 +6,15 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Lob;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * <h2>UC-00's whole job: one durable row per {@code applicationId}, written before the {@code 202}.</h2>
@@ -84,11 +89,33 @@ public class ScreeningRecord {
     @Column(name = "callback_time")
     private Instant callbackTime;
 
+    @Column(name = "claimed_by", length = 100)
+    private String claimedBy;
+
+    @Column(name = "claimed_at")
+    private Instant claimedAt;
+
+    @Column(name = "resolved_by", length = 100)
+    private String resolvedBy;
+
+    @Column(name = "resolved_at")
+    private Instant resolvedAt;
+
+    @Column(name = "resolution", length = 20)
+    private String resolution;
+
+    @Column(name = "resolution_reason", length = 500)
+    private String resolutionReason;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+
+    @OneToMany(mappedBy = "screeningRecord")
+    @OrderBy("overrideTime DESC, id DESC")
+    private List<OverrideLog> overrideLogs = new ArrayList<>();
 
     protected ScreeningRecord() {
         // JPA
@@ -146,6 +173,43 @@ public class ScreeningRecord {
         this.callbackTime = when;
     }
 
+    public void claim(String analyst, Instant when) {
+        this.claimedBy = analyst;
+        this.claimedAt = when;
+    }
+
+    public void release() {
+        this.claimedBy = null;
+        this.claimedAt = null;
+    }
+
+    public void resolve(String resolution, String analyst, String reason, ScreeningOutcome outcome,
+                        String reasonCode, Instant when) {
+        this.resolution = resolution;
+        this.resolvedBy = analyst;
+        this.resolutionReason = reason;
+        this.resolvedAt = when;
+        this.finalOutcome = outcome.name();
+        this.reasonCode = reasonCode;
+    }
+
+    /** UC-08's only mutation to the screening record. */
+    public void overrideFinalOutcome(OverrideOutcome outcome) {
+        this.finalOutcome = outcome.name();
+        if (outcome == OverrideOutcome.REVIEW) {
+            this.claimedBy = null;
+            this.claimedAt = null;
+            this.resolvedBy = null;
+            this.resolvedAt = null;
+            this.resolution = null;
+            this.resolutionReason = null;
+        }
+    }
+
+    public void addOverrideLog(OverrideLog overrideLog) {
+        overrideLogs.add(0, overrideLog);
+    }
+
     public Long getId() {
         return id;
     }
@@ -186,11 +250,39 @@ public class ScreeningRecord {
         return callbackTime;
     }
 
+    public String getClaimedBy() {
+        return claimedBy;
+    }
+
+    public Instant getClaimedAt() {
+        return claimedAt;
+    }
+
+    public String getResolvedBy() {
+        return resolvedBy;
+    }
+
+    public Instant getResolvedAt() {
+        return resolvedAt;
+    }
+
+    public String getResolution() {
+        return resolution;
+    }
+
+    public String getResolutionReason() {
+        return resolutionReason;
+    }
+
     public Instant getCreatedAt() {
         return createdAt;
     }
 
     public Instant getUpdatedAt() {
         return updatedAt;
+    }
+
+    public List<OverrideLog> getOverrideLogs() {
+        return Collections.unmodifiableList(overrideLogs);
     }
 }
