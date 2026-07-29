@@ -169,19 +169,6 @@ export default function AlertDetail({ applicationId }) {
               Evidence replayed from the stored record via GET /api/v1/applications/{'{id}'} —
               this screen never re-matches on open.
             </Caption>
-            {overrides.length > 0 && (
-              <Card title="Override history" subtitle="append-only audit trail" tone="warning">
-                <Timeline
-                  items={overrides.map((entry, index) => ({
-                    id: `${entry.overriddenAt}-${index}`,
-                    title: `${entry.oldOutcome} to ${entry.newOutcome}`,
-                    detail: `${entry.operator} · ${entry.reason}`,
-                    when: time(entry.overriddenAt),
-                    tone: statusTone(entry.newOutcome),
-                  }))}
-                />
-              </Card>
-            )}
           </Stack>
         }
       >
@@ -223,6 +210,20 @@ export default function AlertDetail({ applicationId }) {
           </Card>
         </Stack>
       </Split>
+
+      {overrides.length > 0 && (
+        <Card title="Override history" subtitle="append-only audit trail" tone="warning">
+          <Timeline
+            items={overrides.map((entry, index) => ({
+              id: `${entry.overriddenAt}-${index}`,
+              title: `${entry.oldOutcome} to ${entry.newOutcome}`,
+              detail: `${entry.operator} · ${entry.reason}`,
+              when: time(entry.overriddenAt),
+              tone: statusTone(entry.newOutcome),
+            }))}
+          />
+        </Card>
+      )}
     </Stack>
   );
 }
