@@ -39,6 +39,7 @@ export const api = {
   searchCases: (keyword) =>
     request(`/api/v1/applications/cases?keyword=${encodeURIComponent(keyword)}`),
   getApplication: (id) => request(`/api/v1/applications/${id}`),
+  getApplicant: (id) => request(`/api/v1/cases/${encodeURIComponent(id)}/applicant`),
   searchCases: (q, limit = 10) => request(`/api/v1/cases?q=${encodeURIComponent(q)}&limit=${limit}`),
 
   // Screening configuration — insert-only, versioned. See docs/api-docs/screening-config-api-contract.md.

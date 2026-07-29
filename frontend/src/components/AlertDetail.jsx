@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Badge, Caption, Card, DataTable, EmptyState, KeyValue, PageHeader, Spinner, Split, Stack, Tag } from '../design-system';
+import { Alert, Badge, Button, Caption, Card, DataTable, EmptyState, KeyValue, PageHeader, Spinner, Split, Stack } from '../design-system';
 import { api } from '../api.js';
 import { statusTone, time } from '../status.js';
 
@@ -15,6 +15,9 @@ import { statusTone, time } from '../status.js';
 export default function AlertDetail({ applicationId }) {
   const [detail, setDetail] = useState(null);
   const [error, setError] = useState(null);
+  const [applicant, setApplicant] = useState(null);
+  const [applicantError, setApplicantError] = useState(null);
+  const [applicantAttempt, setApplicantAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -28,6 +31,19 @@ export default function AlertDetail({ applicationId }) {
       cancelled = true;
     };
   }, [applicationId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setApplicant(null);
+    setApplicantError(null);
+    api
+      .getApplicant(applicationId)
+      .then((data) => !cancelled && setApplicant(data))
+      .catch((e) => !cancelled && setApplicantError(e.message));
+    return () => {
+      cancelled = true;
+    };
+  }, [applicationId, applicantAttempt]);
 
   if (error) {
     return (
@@ -86,11 +102,45 @@ export default function AlertDetail({ applicationId }) {
       <Split
         sidebar={
           <Stack gap={4}>
+            <Card title="Applicant" subtitle="Live from the orchestrator">
+              {applicant ? (
+                <KeyValue
+                  items={[
+                    ['Full name', applicant.fullName ?? '—'],
+                    ['Date of birth', applicant.dateOfBirth ?? '—'],
+                    ['Residence', applicant.countryOfResidence ?? '—'],
+                    ['Nationality', applicant.nationality ?? '—'],
+                    ['Channel', applicant.channel ?? '—'],
+                  ]}
+                />
+              ) : applicantError ? (
+                <Alert
+                  title="Applicant details unavailable"
+                  action={
+                    <Button size="sm" onClick={() => setApplicantAttempt((attempt) => attempt + 1)}>
+                      Retry
+                    </Button>
+                  }
+                >
+                  {applicantError}
+                </Alert>
+              ) : (
+                <Stack gap={3} style={{ alignItems: 'center', padding: 'var(--ds-space-5) 0' }}>
+                  <Spinner />
+                  <Caption>Loading applicant details</Caption>
+                </Stack>
+              )}
+            </Card>
             <Card title="This case">
               <KeyValue
                 items={[
                   ['Application', <span style={{ fontFamily: 'var(--ds-font-mono)' }}>{detail.applicationId}</span>],
-                  ['Reason code', <Tag>{detail.reasonCode ?? '—'}</Tag>],
+                  [
+                    'Reason code',
+                    <span style={{ fontFamily: 'var(--ds-font-mono)', overflowWrap: 'anywhere' }}>
+                      {detail.reasonCode ?? '—'}
+                    </span>,
+                  ],
                   ['Processing', detail.processingStatus],
                   ['Callback', <Badge tone={statusTone(detail.callbackStatus)}>{detail.callbackStatus}</Badge>],
                   ['Opened', time(detail.createdAt)],

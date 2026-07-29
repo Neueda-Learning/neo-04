@@ -1,5 +1,6 @@
 package com.neobank.module.controller;
 
+import com.neobank.module.integrations.orchestrator.ApplicantUnavailableException;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -70,6 +71,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<Map<String, Object>> handleConflict(IllegalStateException ex) {
         return error(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
+    @ExceptionHandler(ApplicantUnavailableException.class)
+    public ResponseEntity<Map<String, Object>> handleApplicantUnavailable(ApplicantUnavailableException ex) {
+        return error(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
     }
 
     private ResponseEntity<Map<String, Object>> error(HttpStatus status, String message) {
