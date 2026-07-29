@@ -7,21 +7,19 @@ import {
   EmptyState,
   Grid,
   MetricTile,
-  Modal,
   PageHeader,
   SearchInput,
   Toolbar,
 } from '../design-system';
 import { statusTone, STATUSES, time } from '../status.js';
-import AlertDetail from './AlertDetail.jsx';
 
 const FILTERS = ['All', ...STATUSES];
 
 /**
  * Everything this module has answered.
  *
- * uc-02 · Review Alert: a row opens {@link AlertDetail} in a modal, showing the evidence behind
- * the outcome (candidates considered, country risk, sampling) — read-only, never re-matched.
+ * A plain read-only board — no row detail here. HIT/REVIEW applications get their evidence
+ * (uc-02 · Review Alert) on the Alert screen instead; this screen just shows what came in.
  *
  * The board follows the platform shape (design-system/DESIGN.md § "Board"): a header stating the
  * screen's rules, a toolbar that narrows, a capped table. The 10-row cap and its footnote come from
@@ -30,7 +28,6 @@ const FILTERS = ['All', ...STATUSES];
 export default function RequestsScreen({ requests, error, info }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('All');
-  const [openId, setOpenId] = useState(null);
 
   const counts = useMemo(
     () =>
@@ -104,7 +101,6 @@ export default function RequestsScreen({ requests, error, info }) {
         rows={matches}
         total={matches.length}
         rowKey={(r) => r.applicationId}
-        onRowClick={(r) => setOpenId(r.applicationId)}
         footnote="newest first"
         empty={
           <EmptyState
@@ -122,15 +118,6 @@ export default function RequestsScreen({ requests, error, info }) {
           </EmptyState>
         }
       />
-
-      <Modal
-        open={openId != null}
-        title="Case detail"
-        wide
-        onClose={() => setOpenId(null)}
-      >
-        {openId != null && <AlertDetail applicationId={openId} />}
-      </Modal>
     </>
   );
 }
