@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { AppShell, Button, SideBrand, SideNav, StatusPill } from './design-system';
 import RequestsScreen from './components/RequestsScreen.jsx';
+import CasesScreen from './components/CasesScreen.jsx';
 import ScreeningConfigScreen from './components/ScreeningConfigScreen.jsx';
 import { api } from './api.js';
 
@@ -17,7 +18,7 @@ const HEALTH_MS = 10000;
  */
 const SCREENS = [
   { id: 'applications', label: 'Applications' },
-  { id: 'cases', label: 'Cases', hint: 'your own table', disabled: true },
+  { id: 'cases', label: 'Cases', hint: 'your own table' },
   { id: 'overrides', label: 'Overrides', hint: 'operator actions', disabled: true },
   { id: 'screening-config', label: 'Screening config', hint: 'watchlist · country risk · history' },
 ];
@@ -100,6 +101,7 @@ export default function App() {
       {screen === 'applications' && (
         <RequestsScreen requests={requests} error={error} info={info} />
       )}
+      {screen === 'cases' && <CasesScreen />}
       {screen === 'screening-config' && <ScreeningConfigScreen />}
     </AppShell>
   );

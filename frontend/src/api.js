@@ -36,6 +36,8 @@ export const api = {
   health: () => request('/health'),
   info: () => request('/info'),
   listApplications: () => request('/api/v1/applications'),
+  searchCases: (keyword) =>
+    request(`/api/v1/applications/cases?keyword=${encodeURIComponent(keyword)}`),
   getApplication: (id) => request(`/api/v1/applications/${id}`),
 
   // Screening configuration — insert-only, versioned. See docs/api-docs/screening-config-api-contract.md.
