@@ -16,6 +16,7 @@ import com.neobank.module.dto.ScreeningRecordDetailView;
 import com.neobank.module.integrations.orchestrator.ApplicationRequest;
 import com.neobank.module.service.ApplicationService;
 import java.time.Instant;
+import java.util.List;
 import java.util.NoSuchElementException;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -168,7 +169,7 @@ class ApplicationControllerTest {
                 """);
         var detail = new ScreeningRecordDetailView("app-1355", "HIT", "HIT", "COMPLETE", "SENT",
                 "SCR_EXACT_MATCH", 1, evidence, null, null, null, null, null, null,
-                Instant.parse("2026-07-21T21:40:00Z"),
+                List.of(), Instant.parse("2026-07-21T21:40:00Z"),
                 Instant.parse("2026-07-21T21:40:03Z"));
         when(applications.findOne("app-1355")).thenReturn(detail);
 

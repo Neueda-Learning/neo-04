@@ -57,6 +57,10 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+  overrideCase: (id, body) => request(`/api/v1/cases/${id}/override`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  }),
 
   // Screening configuration — insert-only, versioned. See docs/api-docs/screening-config-api-contract.md.
   listScreeningConfigs: () => request('/api/v1/screening-configs'),

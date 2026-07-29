@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Badge, Button, Caption, Card, DataTable, EmptyState, KeyValue, PageHeader, Spinner, Split, Stack } from '../design-system';
+import { Alert, Badge, Button, Caption, Card, DataTable, EmptyState, KeyValue, PageHeader, Spinner, Split, Stack, Timeline } from '../design-system';
 import { api } from '../api.js';
 import { statusTone, time } from '../status.js';
 
@@ -63,6 +63,7 @@ export default function AlertDetail({ applicationId }) {
   const candidates = evidence.candidates ?? [];
   const countryRisk = evidence.countryRisk;
   const sampling = evidence.sampling;
+  const overrides = detail.overrides ?? [];
 
   const candidateColumns = [
     { key: 'entryId', header: 'Watchlist entry', mono: true },
@@ -92,11 +93,13 @@ export default function AlertDetail({ applicationId }) {
         title={detail.applicationId}
         badge={<Badge tone={statusTone(detail.finalOutcome)}>{detail.finalOutcome}</Badge>}
         lede={
-          detail.resolution
-            ? `${detail.resolution.toLowerCase()} by ${detail.resolvedBy}`
-            : detail.finalOutcome !== detail.machineOutcome
-            ? `machine said ${detail.machineOutcome} — sampled for review`
-            : undefined
+          overrides.length
+            ? `machine said ${detail.machineOutcome} · operator set ${detail.finalOutcome}`
+            : detail.resolution
+              ? `${detail.resolution.toLowerCase()} by ${detail.resolvedBy}`
+              : detail.finalOutcome !== detail.machineOutcome
+                ? `machine said ${detail.machineOutcome} · sampled for review`
+                : undefined
         }
         meta={`config v${detail.configVersion ?? '—'} · decided ${time(detail.updatedAt)}`}
       />
@@ -166,6 +169,19 @@ export default function AlertDetail({ applicationId }) {
               Evidence replayed from the stored record via GET /api/v1/applications/{'{id}'} —
               this screen never re-matches on open.
             </Caption>
+            {overrides.length > 0 && (
+              <Card title="Override history" subtitle="append-only audit trail" tone="warning">
+                <Timeline
+                  items={overrides.map((entry, index) => ({
+                    id: `${entry.overriddenAt}-${index}`,
+                    title: `${entry.oldOutcome} to ${entry.newOutcome}`,
+                    detail: `${entry.operator} · ${entry.reason}`,
+                    when: time(entry.overriddenAt),
+                    tone: statusTone(entry.newOutcome),
+                  }))}
+                />
+              </Card>
+            )}
           </Stack>
         }
       >

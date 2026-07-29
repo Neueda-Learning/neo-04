@@ -5,8 +5,11 @@ import com.neobank.module.dto.AnalystClaimRequest;
 import com.neobank.module.dto.AnalystQueueView;
 import com.neobank.module.dto.AnalystResolutionRequest;
 import com.neobank.module.dto.CaseSearchView;
+import com.neobank.module.dto.OverrideCaseRequest;
+import com.neobank.module.dto.ScreeningRecordDetailView;
 import com.neobank.module.service.AnalystQueueService;
 import com.neobank.module.service.CasesService;
+import com.neobank.module.service.OverrideCaseService;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,10 +32,13 @@ public class CasesController {
 
     private final CasesService cases;
     private final AnalystQueueService queue;
+    private final OverrideCaseService overrides;
 
-    public CasesController(CasesService cases, AnalystQueueService queue) {
+    public CasesController(CasesService cases, AnalystQueueService queue,
+                           OverrideCaseService overrides) {
         this.cases = cases;
         this.queue = queue;
+        this.overrides = overrides;
     }
 
     /**
@@ -76,5 +82,12 @@ public class CasesController {
     public AnalystQueueView resolve(@PathVariable String applicationId,
                                     @Valid @RequestBody AnalystResolutionRequest request) {
         return queue.resolve(applicationId, request);
+    }
+
+    @PostMapping("/{applicationId}/override")
+    public ScreeningRecordDetailView override(
+            @PathVariable String applicationId,
+            @Valid @RequestBody OverrideCaseRequest request) {
+        return overrides.override(applicationId, request);
     }
 }

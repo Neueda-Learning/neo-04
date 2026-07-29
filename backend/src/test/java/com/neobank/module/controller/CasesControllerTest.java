@@ -6,7 +6,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.neobank.module.dto.ApplicantView;
 import com.neobank.module.integrations.orchestrator.ApplicantUnavailableException;
+import com.neobank.module.service.AnalystQueueService;
 import com.neobank.module.service.CasesService;
+import com.neobank.module.service.OverrideCaseService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -23,6 +25,12 @@ class CasesControllerTest {
 
     @MockBean
     private CasesService cases;
+
+    @MockBean
+    private AnalystQueueService queue;
+
+    @MockBean
+    private OverrideCaseService overrides;
 
     @Test
     void returnsTheLiveApplicantProjection() throws Exception {

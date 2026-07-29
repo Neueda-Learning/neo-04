@@ -1,15 +1,15 @@
 package com.neobank.module.repository;
 
 import com.neobank.module.model.ScreeningRecord;
+import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.repository.query.Param;
-import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 /**
  * One row per {@code applicationId} — {@link #existsByApplicationId} is what makes UC-00's
@@ -20,6 +20,10 @@ public interface ScreeningRecordRepository extends JpaRepository<ScreeningRecord
     boolean existsByApplicationId(String applicationId);
 
     Optional<ScreeningRecord> findByApplicationId(String applicationId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select row from ScreeningRecord row where row.applicationId = :applicationId")
+    Optional<ScreeningRecord> findByApplicationIdForUpdate(@Param("applicationId") String applicationId);
 
     /**
      * Newest first, with the {@code id} tiebreak {@code DemoShowcaseRepositoryIT} discovered:
@@ -66,7 +70,4 @@ public interface ScreeningRecordRepository extends JpaRepository<ScreeningRecord
                          @Param("analyst") String analyst,
                          @Param("claimedAt") java.time.Instant claimedAt);
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select s from ScreeningRecord s where s.applicationId = :applicationId")
-    Optional<ScreeningRecord> findByApplicationIdForUpdate(@Param("applicationId") String applicationId);
 }
