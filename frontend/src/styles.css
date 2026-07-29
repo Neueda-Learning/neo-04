@@ -19,3 +19,9 @@
   gap: var(--ds-space-3);
   padding: 0 var(--ds-space-2);
 }
+
+.queue-causes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ds-space-2);
+}

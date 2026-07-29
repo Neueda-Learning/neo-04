@@ -5,6 +5,11 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.repository.query.Param;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
 
 /**
  * One row per {@code applicationId} — {@link #existsByApplicationId} is what makes UC-00's
@@ -40,4 +45,28 @@ public interface ScreeningRecordRepository extends JpaRepository<ScreeningRecord
      * Ordered newest first.
      */
     List<ScreeningRecord> findByApplicationIdInOrderByCreatedAtDesc(List<String> applicationIds);
+
+    @Query("""
+            select s from ScreeningRecord s
+            where s.finalOutcome = 'REVIEW' and s.resolution is null
+            order by case when s.claimedBy is null then 0 else 1 end, s.createdAt asc, s.id asc
+            """)
+    List<ScreeningRecord> findOpenAnalystQueue(Pageable pageable);
+
+    List<ScreeningRecord> findByFinalOutcomeAndResolutionIsNullOrderByCreatedAtAscIdAsc(
+            String finalOutcome, Pageable pageable);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update ScreeningRecord s set s.claimedBy = :analyst, s.claimedAt = :claimedAt
+            where s.applicationId = :applicationId and s.finalOutcome = 'REVIEW'
+              and s.resolution is null and s.claimedBy is null
+            """)
+    int claimIfAvailable(@Param("applicationId") String applicationId,
+                         @Param("analyst") String analyst,
+                         @Param("claimedAt") java.time.Instant claimedAt);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select s from ScreeningRecord s where s.applicationId = :applicationId")
+    Optional<ScreeningRecord> findByApplicationIdForUpdate(@Param("applicationId") String applicationId);
 }

@@ -92,7 +92,9 @@ export default function AlertDetail({ applicationId }) {
         title={detail.applicationId}
         badge={<Badge tone={statusTone(detail.finalOutcome)}>{detail.finalOutcome}</Badge>}
         lede={
-          detail.finalOutcome !== detail.machineOutcome
+          detail.resolution
+            ? `${detail.resolution.toLowerCase()} by ${detail.resolvedBy}`
+            : detail.finalOutcome !== detail.machineOutcome
             ? `machine said ${detail.machineOutcome} — sampled for review`
             : undefined
         }
@@ -131,6 +133,18 @@ export default function AlertDetail({ applicationId }) {
                 </Stack>
               )}
             </Card>
+            {detail.resolution && (
+              <Card title="Human resolution" tone="positive">
+                <KeyValue
+                  items={[
+                    ['Resolution', <Badge tone={statusTone(detail.finalOutcome)}>{detail.resolution}</Badge>],
+                    ['Analyst', detail.resolvedBy],
+                    ['Resolved', time(detail.resolvedAt)],
+                    ['Reason', detail.resolutionReason],
+                  ]}
+                />
+              </Card>
+            )}
             <Card title="This case">
               <KeyValue
                 items={[

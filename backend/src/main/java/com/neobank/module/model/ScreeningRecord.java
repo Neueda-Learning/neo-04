@@ -84,6 +84,24 @@ public class ScreeningRecord {
     @Column(name = "callback_time")
     private Instant callbackTime;
 
+    @Column(name = "claimed_by", length = 100)
+    private String claimedBy;
+
+    @Column(name = "claimed_at")
+    private Instant claimedAt;
+
+    @Column(name = "resolved_by", length = 100)
+    private String resolvedBy;
+
+    @Column(name = "resolved_at")
+    private Instant resolvedAt;
+
+    @Column(name = "resolution", length = 20)
+    private String resolution;
+
+    @Column(name = "resolution_reason", length = 500)
+    private String resolutionReason;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -146,6 +164,26 @@ public class ScreeningRecord {
         this.callbackTime = when;
     }
 
+    public void claim(String analyst, Instant when) {
+        this.claimedBy = analyst;
+        this.claimedAt = when;
+    }
+
+    public void release() {
+        this.claimedBy = null;
+        this.claimedAt = null;
+    }
+
+    public void resolve(String resolution, String analyst, String reason, ScreeningOutcome outcome,
+                        String reasonCode, Instant when) {
+        this.resolution = resolution;
+        this.resolvedBy = analyst;
+        this.resolutionReason = reason;
+        this.resolvedAt = when;
+        this.finalOutcome = outcome.name();
+        this.reasonCode = reasonCode;
+    }
+
     public Long getId() {
         return id;
     }
@@ -184,6 +222,30 @@ public class ScreeningRecord {
 
     public Instant getCallbackTime() {
         return callbackTime;
+    }
+
+    public String getClaimedBy() {
+        return claimedBy;
+    }
+
+    public Instant getClaimedAt() {
+        return claimedAt;
+    }
+
+    public String getResolvedBy() {
+        return resolvedBy;
+    }
+
+    public Instant getResolvedAt() {
+        return resolvedAt;
+    }
+
+    public String getResolution() {
+        return resolution;
+    }
+
+    public String getResolutionReason() {
+        return resolutionReason;
     }
 
     public Instant getCreatedAt() {

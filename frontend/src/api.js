@@ -41,6 +41,22 @@ export const api = {
   getApplication: (id) => request(`/api/v1/applications/${id}`),
   getApplicant: (id) => request(`/api/v1/cases/${encodeURIComponent(id)}/applicant`),
   searchCases: (q, limit = 10) => request(`/api/v1/cases?q=${encodeURIComponent(q)}&limit=${limit}`),
+  listReviewQueue: () => request('/api/v1/cases?outcome=REVIEW&unclaimed-first=true'),
+  claimCase: (id, analyst) =>
+    request(`/api/v1/cases/${encodeURIComponent(id)}/claim`, {
+      method: 'POST',
+      body: JSON.stringify({ analyst }),
+    }),
+  releaseCase: (id, analyst) =>
+    request(`/api/v1/cases/${encodeURIComponent(id)}/release`, {
+      method: 'POST',
+      body: JSON.stringify({ analyst }),
+    }),
+  resolveCase: (id, body) =>
+    request(`/api/v1/cases/${encodeURIComponent(id)}/resolution`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
 
   // Screening configuration — insert-only, versioned. See docs/api-docs/screening-config-api-contract.md.
   listScreeningConfigs: () => request('/api/v1/screening-configs'),

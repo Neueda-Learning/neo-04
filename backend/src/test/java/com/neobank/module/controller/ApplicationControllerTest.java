@@ -167,7 +167,8 @@ class ApplicationControllerTest {
                  "sampling":{"sampled":false,"position":null}}
                 """);
         var detail = new ScreeningRecordDetailView("app-1355", "HIT", "HIT", "COMPLETE", "SENT",
-                "SCR_EXACT_MATCH", 1, evidence, Instant.parse("2026-07-21T21:40:00Z"),
+                "SCR_EXACT_MATCH", 1, evidence, null, null, null, null, null, null,
+                Instant.parse("2026-07-21T21:40:00Z"),
                 Instant.parse("2026-07-21T21:40:03Z"));
         when(applications.findOne("app-1355")).thenReturn(detail);
 

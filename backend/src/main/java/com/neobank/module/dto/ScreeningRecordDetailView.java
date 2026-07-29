@@ -23,6 +23,12 @@ public record ScreeningRecordDetailView(
         String reasonCode,
         Integer configVersion,
         JsonNode evidence,
+        String claimedBy,
+        Instant claimedAt,
+        String resolvedBy,
+        Instant resolvedAt,
+        String resolution,
+        String resolutionReason,
         Instant createdAt,
         Instant updatedAt) {
 
@@ -36,6 +42,12 @@ public record ScreeningRecordDetailView(
                 row.getReasonCode(),
                 row.getConfigVersion(),
                 parseEvidence(row.getEvidence(), json),
+                row.getClaimedBy(),
+                row.getClaimedAt(),
+                row.getResolvedBy(),
+                row.getResolvedAt(),
+                row.getResolution(),
+                row.getResolutionReason(),
                 row.getCreatedAt(),
                 row.getUpdatedAt());
     }
