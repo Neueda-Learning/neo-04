@@ -13,20 +13,18 @@ import {
 } from '../design-system';
 import { api } from '../api.js';
 import { statusTone, STATUSES, time } from '../status.js';
+import '../styles/requests-screen.css';
 
 const FILTERS = ['All', ...STATUSES];
 
 /**
- * Everything this module has answered.
- *
- * A plain read-only board with server-side search: search by application ID or applicant name
- * (uc-01). Local requests are shown by default; entering a search query calls the backend
- * search API which supports both ID and name-based lookups. HIT/REVIEW applications get their
- * evidence (uc-02 · Review Alert) on the Alert screen instead.
- *
- * The board follows the platform shape (design-system/DESIGN.md § "Board"): a header stating the
- * screen's rules, a toolbar that narrows, a capped table. The 10-row cap and its footnote come from
- * DataTable — no screen re-implements them.
+ * Applications Board: Server-side search for IDs/names, status filtering, and quick metrics.
+ * 
+ * Features:
+ * - Real-time server-side search (debounced 300ms)
+ * - Status-based filtering with live counts
+ * - Responsive metric cards showing key statistics
+ * - Empty states guide users through initial setup
  */
 export default function RequestsScreen({ requests, error, info }) {
   const [query, setQuery] = useState('');

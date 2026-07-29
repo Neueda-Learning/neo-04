@@ -1,0 +1,111 @@
+/* Queue Causes: Flexible layout for analyst queue */
+.queue-causes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ds-space-2);
+  align-items: center;
+}
+
+.queue-cause-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ds-space-1);
+  padding: var(--ds-space-2) var(--ds-space-3);
+  background: var(--ds-color-bg-hover);
+  border-radius: var(--ds-radius-md);
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+
+.queue-cause-item:hover {
+  background: var(--ds-color-bg-active);
+  transform: translateY(-1px);
+}
+
+/* Health indicator pulse animation */
+.health-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  padding: var(--ds-space-2) var(--ds-space-3);
+  border-radius: var(--ds-radius-full);
+  font-weight: 600;
+  font-size: 0.9rem;
+  letter-spacing: 0.5px;
+  position: relative;
+  overflow: hidden;
+}
+
+.health-pill::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  transform: translateY(-50%);
+  animation: pulse-status 2s infinite;
+}
+
+.health-pill.up::before {
+  background: var(--ds-color-positive);
+}
+
+.health-pill.down::before {
+  background: var(--ds-color-negative);
+  animation: pulse-danger 1s infinite;
+}
+
+/* Pulse animations */
+@keyframes pulse-status {
+  0%, 100% {
+    opacity: 1;
+    transform: translateY(-50%) scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: translateY(-50%) scale(1.2);
+  }
+}
+
+@keyframes pulse-danger {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+/* Responsive adjustments for queue causes */
+@media (max-width: 768px) {
+  .queue-causes {
+    gap: var(--ds-space-1);
+  }
+
+  .queue-cause-item {
+    font-size: 0.8rem;
+    padding: var(--ds-space-1) var(--ds-space-2);
+  }
+}
+
+/* Reduced motion: disable animations */
+@media (prefers-reduced-motion: reduce) {
+  .health-pill::before,
+  .queue-cause-item {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* Dark mode: subtle adjustments */
+@media (prefers-color-scheme: dark) {
+  .queue-cause-item {
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .queue-cause-item:hover {
+    background: rgba(255, 255, 255, 0.12);
+  }
+}

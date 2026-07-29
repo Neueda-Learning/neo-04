@@ -1,0 +1,309 @@
+/* App Shell: Professional Banking Interface */
+
+/* Root app styling */
+:root {
+  /* Professional color palette for banking/AML screening */
+  --app-primary: #1e40af;
+  --app-success: #16a34a;
+  --app-warning: #ea580c;
+  --app-danger: #dc2626;
+  --app-info: #0284c7;
+
+  /* Spacing scale (8px base) */
+  --app-space-xs: 0.25rem;
+  --app-space-sm: 0.5rem;
+  --app-space-md: 1rem;
+  --app-space-lg: 1.5rem;
+  --app-space-xl: 2rem;
+  --app-space-2xl: 3rem;
+
+  /* Typography scale */
+  --app-text-sm: 0.875rem;
+  --app-text-base: 1rem;
+  --app-text-lg: 1.125rem;
+  --app-text-xl: 1.25rem;
+  --app-text-2xl: 1.5rem;
+
+  /* Shadows for depth */
+  --app-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --app-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --app-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+
+  /* Transitions */
+  --app-transition-fast: 150ms ease;
+  --app-transition-base: 200ms ease;
+  --app-transition-slow: 300ms ease;
+}
+
+/* App shell layout */
+.app-shell {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr auto;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+  overflow: hidden;
+}
+
+/* Main content area */
+.app-shell main {
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--ds-space-6);
+  animation: fadeIn 0.4s ease-out;
+}
+
+/* Sidebar: navigation and status */
+.app-side-status {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-3);
+  padding: var(--ds-space-4) var(--ds-space-2);
+  border-top: 1px solid var(--ds-color-border);
+  background: var(--ds-color-bg);
+  transition: all var(--app-transition-base);
+}
+
+.app-side-status .ds-status-pill {
+  flex-shrink: 0;
+}
+
+.app-side-status button {
+  flex-shrink: 0;
+  transition: all var(--app-transition-fast);
+}
+
+.app-side-status button:hover {
+  background: var(--ds-color-bg-hover);
+  transform: translateY(-1px);
+}
+
+/* Sidebar brand styling */
+.side-brand {
+  padding: var(--ds-space-4);
+  border-bottom: 2px solid var(--ds-color-border);
+  animation: slideDown 0.3s ease-out;
+}
+
+.side-brand-team {
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--ds-color-text-muted);
+  margin-bottom: var(--ds-space-1);
+}
+
+.side-brand-service {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--ds-color-text-strong);
+  margin-bottom: var(--ds-space-2);
+}
+
+.side-brand-meta {
+  font-size: 0.75rem;
+  color: var(--ds-color-text-muted);
+  font-family: var(--ds-font-family-mono);
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+/* Screen transitions */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Scrollbar styling: subtle and professional */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--ds-color-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--ds-color-border);
+  border-radius: 4px;
+  transition: all var(--app-transition-fast);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ds-color-text-muted);
+}
+
+/* Focus states: accessible and visible */
+:focus-visible {
+  outline: 2px solid var(--ds-color-primary);
+  outline-offset: 2px;
+}
+
+button:focus-visible {
+  outline-offset: -2px;
+}
+
+/* Loading states */
+.app-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  color: var(--ds-color-text-muted);
+}
+
+.app-loading::after {
+  content: '';
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--ds-color-border);
+  border-top-color: var(--ds-color-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Responsive design */
+@media (max-width: 1024px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .app-shell main {
+    padding: var(--ds-space-4);
+  }
+}
+
+@media (max-width: 640px) {
+  .app-shell main {
+    padding: var(--ds-space-3);
+  }
+
+  .app-side-status {
+    flex-direction: column;
+    gap: var(--ds-space-2);
+  }
+
+  .app-side-status button {
+    width: 100%;
+  }
+
+  .side-brand {
+    padding: var(--ds-space-3);
+  }
+
+  .side-brand-team {
+    font-size: 0.8rem;
+  }
+
+  .side-brand-service {
+    font-size: 1rem;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --app-primary: #3b82f6;
+    --app-success: #4ade80;
+    --app-warning: #fb923c;
+    --app-danger: #ef4444;
+  }
+
+  .app-shell {
+    background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #1f2937;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #4b5563;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #6b7280;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: more) {
+  .app-side-status {
+    border-top-width: 2px;
+  }
+
+  .side-brand {
+    border-bottom-width: 3px;
+  }
+
+  :focus-visible {
+    outline-width: 3px;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .app-shell main,
+  .side-brand,
+  .app-side-status button {
+    animation: none;
+    transition: none;
+  }
+
+  .app-loading::after {
+    animation: none;
+    border-top-color: var(--ds-color-primary);
+  }
+}
+
+/* Print styles */
+@media print {
+  .app-side-status,
+  .side-brand {
+    display: none;
+  }
+
+  .app-shell {
+    grid-template-rows: 1fr;
+  }
+
+  .app-shell main {
+    padding: 0;
+    background: white;
+  }
+}
+
+/* Safe area support for notched devices */
+@supports (padding: max(0px)) {
+  .app-shell main {
+    padding-top: max(var(--ds-space-6), env(safe-area-inset-top));
+    padding-right: max(var(--ds-space-6), env(safe-area-inset-right));
+    padding-bottom: max(var(--ds-space-6), env(safe-area-inset-bottom));
+    padding-left: max(var(--ds-space-6), env(safe-area-inset-left));
+  }
+}

@@ -1,0 +1,273 @@
+/* Alerts Screen: Risk Review & Case Management */
+
+/* Alert metrics grid: prioritized by risk level */
+.alerts-metrics {
+  animation: fadeInUp 0.3s ease-out;
+}
+
+.alerts-metrics .metric-negative {
+  border-left: 4px solid var(--ds-color-negative);
+  background: linear-gradient(135deg, var(--ds-color-negative-light) 0%, transparent 100%);
+}
+
+.alerts-metrics .metric-warning {
+  border-left: 4px solid var(--ds-color-warning);
+  background: linear-gradient(135deg, var(--ds-color-warning-light) 0%, transparent 100%);
+}
+
+/* Risk indicator badges: enhanced visual hierarchy */
+.risk-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  padding: var(--ds-space-2) var(--ds-space-3);
+  border-radius: var(--ds-radius-md);
+  font-weight: 600;
+  font-size: 0.85rem;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  transition: all 0.2s ease;
+}
+
+.risk-badge:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.16);
+}
+
+.risk-badge::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+/* Data table: enhanced row interactivity */
+.alerts-table {
+  cursor: pointer;
+}
+
+.alerts-table tbody tr {
+  transition: all 0.2s ease;
+  border-bottom: 1px solid var(--ds-color-border-subtle);
+}
+
+.alerts-table tbody tr:hover {
+  background: var(--ds-color-bg-hover);
+  border-left: 3px solid var(--ds-color-primary);
+  transform: translateX(4px);
+}
+
+.alerts-table tbody tr:active {
+  background: var(--ds-color-bg-active);
+}
+
+.alerts-table td {
+  padding: var(--ds-space-3) var(--ds-space-4);
+  vertical-align: middle;
+}
+
+/* Application ID column: prominent display */
+.alert-app-id {
+  font-family: var(--ds-font-family-mono);
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 1px;
+  color: var(--ds-color-text-strong);
+}
+
+/* Search input: focused on case finding */
+.alerts-search-box {
+  position: relative;
+}
+
+.alerts-search-box .ds-input {
+  transition: all 0.2s ease;
+}
+
+.alerts-search-box .ds-input:focus {
+  box-shadow: 0 0 0 3px var(--ds-color-primary-light),
+              inset 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+/* Modal: detail view styling */
+.alert-detail-modal {
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.alert-detail-section {
+  padding: var(--ds-space-6);
+  border-bottom: 1px solid var(--ds-color-border);
+  animation: fadeIn 0.3s ease-out;
+}
+
+.alert-detail-section:last-child {
+  border-bottom: none;
+}
+
+.alert-detail-header {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--ds-color-text-strong);
+  margin-bottom: var(--ds-space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+}
+
+.alert-detail-header::before {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 1.2rem;
+  background: var(--ds-color-primary);
+  border-radius: 2px;
+}
+
+/* Empty state: helpful guidance */
+.alerts-empty {
+  padding: var(--ds-space-8) var(--ds-space-4);
+  text-align: center;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.alerts-empty-icon {
+  font-size: 3rem;
+  margin-bottom: var(--ds-space-3);
+  opacity: 0.6;
+}
+
+/* Filter chips: status-based colors */
+.alert-filter-chip {
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.alert-filter-chip[data-status="HIT"] {
+  --chip-color: var(--ds-color-negative);
+}
+
+.alert-filter-chip[data-status="REVIEW"] {
+  --chip-color: var(--ds-color-warning);
+}
+
+/* Animations */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.2);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .alerts-metrics {
+    gap: var(--ds-space-3);
+  }
+
+  .alerts-table td {
+    padding: var(--ds-space-2) var(--ds-space-3);
+    font-size: 0.9rem;
+  }
+
+  .alert-app-id {
+    font-size: 0.85rem;
+  }
+
+  .risk-badge {
+    font-size: 0.7rem;
+    padding: var(--ds-space-1) var(--ds-space-2);
+  }
+
+  .alert-detail-section {
+    padding: var(--ds-space-4);
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .alerts-metrics .metric-negative {
+    background: linear-gradient(135deg, rgba(220, 38, 38, 0.1) 0%, transparent 100%);
+  }
+
+  .alerts-metrics .metric-warning {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, transparent 100%);
+  }
+
+  .risk-badge {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  }
+
+  .risk-badge:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  }
+
+  .alerts-table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.05);
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .alerts-metrics,
+  .risk-badge,
+  .alerts-table tbody tr,
+  .alerts-empty,
+  .alert-detail-section {
+    animation: none;
+    transition: none;
+  }
+
+  .risk-badge::before {
+    animation: none;
+  }
+}
+
+/* Accessibility: focus indicators */
+.alerts-table tbody tr:focus-visible {
+  outline: 2px solid var(--ds-color-primary);
+  outline-offset: -2px;
+}
+
+/* Print styles */
+@media print {
+  .alerts-search-box,
+  .alert-detail-modal {
+    display: none;
+  }
+
+  .alerts-table {
+    border-collapse: collapse;
+  }
+
+  .alerts-table tr {
+    page-break-inside: avoid;
+  }
+}

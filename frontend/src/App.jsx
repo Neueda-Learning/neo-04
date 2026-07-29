@@ -6,6 +6,7 @@ import ScreeningConfigScreen from './components/ScreeningConfigScreen.jsx';
 import AnalystQueueScreen from './components/AnalystQueueScreen.jsx';
 import OverridesScreen from './components/OverridesScreen.jsx';
 import { api } from './api.js';
+import './styles/app.css';
 
 const POLL_MS = 2000;
 const HEALTH_MS = 10000;
@@ -24,12 +25,17 @@ function getInitialScreeningConfigMode() {
 }
 
 /**
- * The screens in the side menu.
- *
- * ⚠️ One real screen and three placeholders — the placeholders are there so the menu shows you
- * where your own screens go, and they are `disabled` so nobody clicks into nothing. Replace them
- * with what your business topic actually needs; the operator UI is a graded deliverable, and a
- * single read-only list is not one.
+ * Neo-04: AML Fraud & Screening Module
+ * 
+ * Five main screens:
+ * - Applications: Full board of submitted applications with server-side search
+ * - Alerts: Flagged cases (HIT/REVIEW) requiring human review with evidence
+ * - Analyst Queue: Case workqueue with claim/decide workflow
+ * - Overrides: Operator actions and case overrides with audit trail
+ * - Screening Config: Watchlists, country risk, and configuration history
+ * 
+ * Navigation: Sidebar with persistent team/service identity and health status.
+ * Real-time polling: Applications list refreshes every 2s, health every 10s.
  */
 const SCREENS = [
   { id: 'applications', label: 'Applications' },
@@ -40,10 +46,11 @@ const SCREENS = [
 ];
 
 /**
- * A sidebar rather than a top bar: this app is expected to grow more screens than a row of tabs
- * holds, and the menu is where a team plans that growth. The identity box above it is the only
- * place the app says who it belongs to — its values come from `/info`, so the same image reads
- * "Team 07" once SERVICE_TEAM says so.
+ * Root application shell with sidebar navigation
+ * 
+ * Sidebar remains fixed during normal navigation, hides during config editing.
+ * Health indicator shows backend status (Up/Down with color-coded pill).
+ * Footer acknowledges architecture: operator UI receives applications from orchestrator only.
  */
 export default function App() {
   const [screen, setScreen] = useState(getInitialScreen);

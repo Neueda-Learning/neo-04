@@ -14,17 +14,20 @@ import {
 } from '../design-system';
 import { statusTone, time } from '../status.js';
 import AlertDetail from './AlertDetail.jsx';
+import '../styles/alerts-screen.css';
 
 const ALERT_OUTCOMES = ['HIT', 'REVIEW'];
 const FILTERS = ['All', ...ALERT_OUTCOMES];
 
 /**
- * Alerts needing a human look: every application this module answered HIT or REVIEW.
- * CLEAR/PENDING applications never appear here — see the Applications screen for the full board.
- *
- * uc-02 · Review Alert: a row opens {@link AlertDetail} in a modal, showing the evidence behind
- * the outcome (candidates considered, country risk, sampling) — read-only, never re-matched.
- * The Applications board itself no longer opens this detail — it lives here only.
+ * Alerts & Risk Review: Cases requiring immediate human attention
+ * 
+ * Displays all HIT and REVIEW applications with direct access to evidence:
+ * - Risk metrics and match details
+ * - Country risk assessments
+ * - Sampling context
+ * 
+ * Click any row to open detailed evidence in modal (uc-02)
  */
 export default function AlertsScreen({ requests, error }) {
   const [query, setQuery] = useState('');
