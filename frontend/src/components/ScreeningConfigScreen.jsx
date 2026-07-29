@@ -60,7 +60,7 @@ function toDraftCountries(entries = []) {
  * updated or deleted in place. History is the audit trail, so it is always on screen beside
  * the current values (design-system/DESIGN.md § "Config").
  */
-export default function ScreeningConfigScreen() {
+export default function ScreeningConfigScreen({ mode = 'history', onModeChange = () => {} }) {
   const [configs, setConfigs] = useState([]);
   const [current, setCurrent] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -87,7 +87,6 @@ export default function ScreeningConfigScreen() {
   const [countryPage, setCountryPage] = useState(1);
   const COUNTRY_PAGE_SIZE = 5;
 
-  const [mode, setMode] = useState('history'); // 'history' | 'edit' | 'view'
   const [viewingVersion, setViewingVersion] = useState(null);
   const [viewLoading, setViewLoading] = useState(false);
   const [loadingVersion, setLoadingVersion] = useState(null);
@@ -229,11 +228,14 @@ export default function ScreeningConfigScreen() {
   }
 
   function editCurrent() {
-    setMode('edit');
+    const url = new URL(window.location.href);
+    url.searchParams.set('screen', 'screening-config');
+    url.searchParams.set('screeningConfigMode', 'edit');
+    window.open(url.toString(), '_blank', 'noopener,noreferrer');
   }
 
   function backToHistory() {
-    setMode('history');
+    onModeChange('history');
     setViewingVersion(null);
   }
 
@@ -242,7 +244,7 @@ export default function ScreeningConfigScreen() {
     setViewLoading(true);
     try {
       setViewingVersion(await api.getScreeningConfigVersion(version));
-      setMode('view');
+      onModeChange('view');
     } catch (e) {
       setNotice({ tone: 'negative', text: e.message });
     } finally {
@@ -253,7 +255,7 @@ export default function ScreeningConfigScreen() {
 
   async function activateAndEdit(version) {
     const detail = await activate(version);
-    if (detail) setMode('edit');
+    if (detail) onModeChange('edit');
   }
 
   function addWatchlistEntry() {
@@ -410,7 +412,7 @@ export default function ScreeningConfigScreen() {
                   </Caption>
                 </div>
                 <Button variant="primary" size="sm" onClick={editCurrent}>
-                  Edit
+                  NEW VERSION
                 </Button>
               </>
             ) : (
