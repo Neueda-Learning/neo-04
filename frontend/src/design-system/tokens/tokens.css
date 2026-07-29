@@ -28,11 +28,11 @@
   --ds-text-2xs: 10px;
   --ds-text-xs: 11px;
   --ds-text-sm: 12px;
-  --ds-text-md: 13px;
-  --ds-text-lg: 15px;
-  --ds-text-xl: 17px;
-  --ds-text-2xl: 21px;
-  --ds-text-3xl: 26px;
+  --ds-text-md: 14px;
+  --ds-text-lg: 16px;
+  --ds-text-xl: 18px;
+  --ds-text-2xl: 24px;
+  --ds-text-3xl: 30px;
 
   --ds-weight-regular: 400;
   --ds-weight-medium: 500;
@@ -50,11 +50,11 @@
   --ds-leading-snug: 1.35;
   --ds-leading-body: 1.55;
 
-  --ds-tracking-tight: -0.01em;
+  --ds-tracking-tight: 0;
   --ds-tracking-body: 0;
   /* Table headers and field labels are the one place the system shouts, and
    * they need the extra tracking to stay legible at 11px uppercase. */
-  --ds-tracking-label: 0.06em;
+  --ds-tracking-label: 0;
 
   /* -- Radii -------------------------------------------------------------- */
   --ds-radius-sm: 4px;
