@@ -14,3 +14,5 @@ databaseChangeLog:
       file: db/changelog/changes/005-seed-watchlist-entries-v1.sql
   - include:
       file: db/changelog/changes/006-alter-screening-config-current-version.yaml
+  - include:
+      file: db/changelog/changes/007-correct-watchlist-seed-names.sql

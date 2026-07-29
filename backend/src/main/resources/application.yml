@@ -39,10 +39,11 @@ spring:
 
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.yaml
-    # Clear invalid checksums automatically in dev — changesets that have been edited after
-    # execution will have mismatched checksums. Production never edits applied changesets, but
-    # development does: this flag prevents the launch from failing on a checksum mismatch.
-    clear-checksums: ${LIQUIBASE_CLEAR_CHECKSUMS:false}
+    # NO clear-checksums HERE, DELIBERATELY. It looks like the cure for "check sum was X but is
+    # now Y" and it is worse than the disease: it nulls the stored check sums so startup passes,
+    # but the change set is still recorded as EXECUTED, so your edited SQL never re-runs. The
+    # error goes away and your change silently does not reach the database. When you hit a check
+    # sum mismatch, restore the applied change set and put the change in a NEW one.
 
   # The pool the decision runs on — Spring Boot's own `applicationTaskExecutor`, so there is no
   # bean to write. The thread-name prefix is what proves, in the logs, that your rules did NOT
