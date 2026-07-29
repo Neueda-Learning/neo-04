@@ -49,9 +49,11 @@ public class CasesService {
         String q = query.trim();
         limit = Math.min(limit, RESULT_LIMIT);
 
-        // Heuristic: if the query looks like an ID (uppercase, hyphen, numbers),
-        // try ID search first. Otherwise, try name search.
-        boolean looksLikeId = q.matches("[A-Z0-9\\-]+");
+        // Heuristic: if the query looks like an ID (must contain hyphen or digit to distinguish
+        // from pure names like "viktor"), try ID search first. Otherwise, try name search.
+        // Patterns: "SIM-15" (hyphen+digit), "sim-15" (lowercase), "SIM15" (no hyphen),
+        // but "viktor" (pure letters) → name search.
+        boolean looksLikeId = q.matches(".*[\\-\\d].*");
 
         if (looksLikeId) {
             log.debug("Searching by application ID: {}", q);
@@ -65,7 +67,9 @@ public class CasesService {
             // Name search: orchestrator only (v5 contract: GET /applications?name=...)
             // This module never stores applicant data, so name search cannot be done locally.
             try {
+                log.debug("Orchestrator client type: {}", orchestrator.getClass().getSimpleName());
                 List<String> applicationIds = orchestrator.searchApplicationsByName(q, limit);
+                log.debug("Orchestrator returned {} results for query: {}", applicationIds.size(), q);
                 if (applicationIds.isEmpty()) {
                     return List.of();
                 }
