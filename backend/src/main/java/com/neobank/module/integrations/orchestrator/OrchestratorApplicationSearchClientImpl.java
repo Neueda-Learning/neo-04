@@ -1,5 +1,8 @@
 package com.neobank.module.integrations.orchestrator;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -22,11 +25,13 @@ public class OrchestratorApplicationSearchClientImpl implements OrchestratorAppl
     private static final Logger log = LoggerFactory.getLogger(OrchestratorApplicationSearchClientImpl.class);
 
     private final RestClient restClient;
+    private final ObjectMapper objectMapper;
 
     public OrchestratorApplicationSearchClientImpl(@Value("${orchestrator.url}") String orchestratorUrl) {
         this.restClient = RestClient.builder()
                 .baseUrl(orchestratorUrl)
                 .build();
+        this.objectMapper = new ObjectMapper();
     }
 
     /**
@@ -43,19 +48,58 @@ public class OrchestratorApplicationSearchClientImpl implements OrchestratorAppl
             return List.of();
         }
         try {
-            List<Map<String, Object>> results = restClient.get()
+            log.debug("Calling orchestrator with query: {} limit: {}", nameQuery, limit);
+            // Orchestrator response format (Docker): direct array of items [{applicationId, ...}, ...]
+            // Orchestrator response format (localhost): { "value": [...], "Count": N }
+            String responseBody = restClient.get()
                     .uri("/api/v1/applications?name={name}&limit={limit}", nameQuery, limit)
                     .retrieve()
-                    .body(new ParameterizedTypeReference<>() {});
+                    .body(String.class);
 
-            if (results == null || results.isEmpty()) {
+            log.debug("Orchestrator raw response: {}", responseBody);
+            
+            if (responseBody == null || responseBody.isBlank()) {
+                log.debug("Empty response body from orchestrator");
                 return List.of();
             }
 
-            return results.stream()
-                    .map(app -> (String) app.get("applicationId"))
-                    .filter(Objects::nonNull)
-                    .toList();
+            // Parse JSON manually using ObjectMapper
+            JsonNode rootNode = objectMapper.readTree(responseBody);
+            
+            List<String> applicationIds = new ArrayList<>();
+            
+            // Handle array response format (Docker)
+            if (rootNode.isArray()) {
+                log.debug("Response is a direct array");
+                for (JsonNode item : rootNode) {
+                    String appId = item.get("applicationId").asText(null);
+                    log.debug("Extracted applicationId from response: {}", appId);
+                    if (appId != null && !appId.isBlank()) {
+                        applicationIds.add(appId);
+                    }
+                }
+            } 
+            // Handle wrapped response format (localhost)
+            else if (rootNode.isObject()) {
+                log.debug("Response is a wrapped object");
+                JsonNode valueNode = rootNode.get("value");
+                
+                if (valueNode == null || !valueNode.isArray()) {
+                    log.debug("No value array in response");
+                    return List.of();
+                }
+                
+                for (JsonNode item : valueNode) {
+                    String appId = item.get("applicationId").asText(null);
+                    log.debug("Extracted applicationId from response: {}", appId);
+                    if (appId != null && !appId.isBlank()) {
+                        applicationIds.add(appId);
+                    }
+                }
+            }
+
+            log.debug("Final applicationIds list: {}", applicationIds);
+            return applicationIds;
         } catch (Exception e) {
             log.warn("Orchestrator name search failed for '{}': {}", nameQuery, e.getMessage());
             // Orchestrator down or does not support ?name= yet -> no results

@@ -105,7 +105,14 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
 
+orchestrator:
+  url: ${ORCHESTRATOR_URL:http://localhost:9000}
+  search:
+    enabled: ${ORCHESTRATOR_SEARCH_ENABLED:true}
+
 logging:
   level:
     liquibase: INFO
     com.neobank.module.service.matching: DEBUG
+    com.neobank.module.service.CasesService: DEBUG
+    com.neobank.module.integrations.orchestrator: DEBUG

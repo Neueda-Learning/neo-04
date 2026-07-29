@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Badge,
@@ -11,6 +11,7 @@ import {
   SearchInput,
   Toolbar,
 } from '../design-system';
+import { api } from '../api.js';
 import { statusTone, STATUSES, time } from '../status.js';
 
 const FILTERS = ['All', ...STATUSES];
@@ -18,8 +19,10 @@ const FILTERS = ['All', ...STATUSES];
 /**
  * Everything this module has answered.
  *
- * A plain read-only board — no row detail here. HIT/REVIEW applications get their evidence
- * (uc-02 · Review Alert) on the Alert screen instead; this screen just shows what came in.
+ * A plain read-only board with server-side search: search by application ID or applicant name
+ * (uc-01). Local requests are shown by default; entering a search query calls the backend
+ * search API which supports both ID and name-based lookups. HIT/REVIEW applications get their
+ * evidence (uc-02 · Review Alert) on the Alert screen instead.
  *
  * The board follows the platform shape (design-system/DESIGN.md § "Board"): a header stating the
  * screen's rules, a toolbar that narrows, a capped table. The 10-row cap and its footnote come from
@@ -28,6 +31,9 @@ const FILTERS = ['All', ...STATUSES];
 export default function RequestsScreen({ requests, error, info }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('All');
+  const [searchResults, setSearchResults] = useState(null);
+  const [searching, setSearching] = useState(false);
+  const searchTimeoutRef = useRef(null);
 
   const counts = useMemo(
     () =>
@@ -38,25 +44,65 @@ export default function RequestsScreen({ requests, error, info }) {
     [requests]
   );
 
+  // Server-side search: call backend when query changes
+  const handleSearch = useCallback((searchQuery) => {
+    setQuery(searchQuery);
+
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    if (!searchQuery.trim()) {
+      setSearchResults(null);
+      return;
+    }
+
+    setSearching(true);
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        const results = await api.searchCases(searchQuery, 10);
+        setSearchResults(results || []);
+      } catch (err) {
+        console.warn('Search failed:', err);
+        setSearchResults([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+  }, []);
+
   const matches = useMemo(() => {
     const needle = query.trim().toLowerCase();
+
+    // If search results exist, use them; otherwise filter local requests
+    if (searchResults !== null) {
+      return searchResults.filter((r) => {
+        if (filter !== 'All' && r.outcome !== filter) return false;
+        return true;
+      });
+    }
+
+    // Local filter when no search
     return requests.filter((r) => {
       if (filter !== 'All' && r.finalOutcome !== filter) return false;
       if (!needle) return true;
       return r.applicationId.toLowerCase().includes(needle);
     });
-  }, [requests, query, filter]);
+  }, [requests, query, filter, searchResults]);
 
-  const columns = [
-    { key: 'applicationId', header: 'Application', mono: true },
-    {
-      key: 'finalOutcome',
-      header: 'Outcome',
-      tight: true,
-      render: (r) => <Badge tone={statusTone(r.finalOutcome)}>{r.finalOutcome}</Badge>,
-    },
-    { key: 'createdAt', header: 'Answered', render: (r) => time(r.createdAt) },
-  ];
+  const columns = useMemo(
+    () => [
+      { key: 'applicationId', header: 'Application', mono: true },
+      {
+        key: 'finalOutcome',
+        header: 'Outcome',
+        tight: true,
+        render: (r) => <Badge tone={statusTone(r.finalOutcome)}>{r.finalOutcome || r.outcome}</Badge>,
+      },
+      { key: 'createdAt', header: 'Answered', render: (r) => time(r.createdAt) },
+    ],
+    []
+  );
 
 
   return (
@@ -88,10 +134,10 @@ export default function RequestsScreen({ requests, error, info }) {
       <Toolbar>
         <SearchInput
           grow
-          placeholder="Application id"
+          placeholder="Search by ID or name..."
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          aria-label="Search applications"
+          onChange={(e) => handleSearch(e.target.value)}
+          aria-label="Search applications by ID or applicant name"
         />
         <ChipGroup options={FILTERS} value={filter} onChange={setFilter} counts={counts} />
       </Toolbar>
