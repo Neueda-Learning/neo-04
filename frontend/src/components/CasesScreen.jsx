@@ -1,7 +1,8 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Alert,
   Badge,
+  Button,
   DataTable,
   EmptyState,
   PageHeader,
@@ -11,132 +12,112 @@ import {
 import { statusTone, time } from '../status.js';
 import { api } from '../api.js';
 
-/**
- * uc-01: Screening Case Board — search by application ID or applicant name.
- *
- * Empty by default (AC1). The applicant-name column hydrates live, one GET per row,
- * cached per page view (AC4). Name column shows "—" if the fetch fails (AC7).
- */
 export default function CasesScreen() {
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState(null); // null = not searched yet
-  const [loading, setLoading] = useState(false);
+  const [keyword, setKeyword] = useState('');
+  const [rows, setRows] = useState([]);
+  const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
-  // Cache: applicationId -> applicant name (or '—' on error)
-  const nameCache = useRef({});
+  const [searched, setSearched] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const search = useCallback(async (q) => {
-    if (!q || !q.trim()) {
-      setResults(null);
+  const columns = useMemo(
+    () => [
+      { key: 'applicationId', header: 'Application', mono: true },
+      {
+        key: 'finalOutcome',
+        header: 'Final outcome',
+        tight: true,
+        render: (r) => <Badge tone={statusTone(r.finalOutcome)}>{r.finalOutcome}</Badge>,
+      },
+      {
+        key: 'processingStatus',
+        header: 'Processing',
+        tight: true,
+        render: (r) => <Badge tone={statusTone(r.processingStatus)}>{r.processingStatus}</Badge>,
+      },
+      { key: 'createdAt', header: 'Submitted', render: (r) => time(r.createdAt) },
+    ],
+    []
+  );
+
+  async function search() {
+    const trimmed = keyword.trim();
+    if (!trimmed) {
+      setRows([]);
+      setMessage(null);
+      setError(null);
+      setSearched(false);
       return;
     }
+
     setLoading(true);
-    setError(null);
     try {
-      const rows = await api.searchCases(q.trim());
-      setResults(rows);
-      // Hydrate names for each row (AC4 — at most 10 calls per render)
-      rows.forEach((row) => {
-        if (nameCache.current[row.applicationId] !== undefined) return;
-        nameCache.current[row.applicationId] = null; // loading sentinel
-        api.getApplication(row.applicationId)
-          .then((app) => {
-            nameCache.current[row.applicationId] = app?.application?.applicant?.fullName ?? '—';
-            // Trigger a re-render by replacing the array
-            setResults((prev) => prev ? [...prev] : prev);
-          })
-          .catch(() => {
-            nameCache.current[row.applicationId] = '—';
-            setResults((prev) => prev ? [...prev] : prev);
-          });
-      });
+      const result = await api.searchCases(trimmed);
+      setRows(Array.isArray(result?.items) ? result.items : []);
+      setMessage(result?.message ?? null);
+      setError(null);
+      setSearched(true);
     } catch (e) {
+      setRows([]);
+      setMessage(null);
       setError(e.message);
-      setResults([]);
+      setSearched(true);
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter') search(query);
-  };
-
-  const columns = [
-    { key: 'applicationId', header: 'Application', mono: true },
-    {
-      key: 'applicantName',
-      header: 'Applicant',
-      render: (r) => {
-        const name = nameCache.current[r.applicationId];
-        if (name === undefined || name === null) return <span style={{ color: 'var(--ds-color-text-subtle)' }}>loading…</span>;
-        if (name === '—') return <span style={{ color: 'var(--ds-color-text-subtle)' }}>—</span>;
-        return name;
-      },
-    },
-    {
-      key: 'outcome',
-      header: 'Outcome',
-      tight: true,
-      render: (r) => <Badge tone={statusTone(r.outcome)}>{r.outcome}</Badge>,
-    },
-    {
-      key: 'matchCount',
-      header: 'Matches',
-      tight: true,
-      render: (r) => r.matchCount,
-    },
-    {
-      key: 'submittedAt',
-      header: 'Received',
-      render: (r) => time(r.submittedAt),
-    },
-  ];
+  }
 
   return (
     <>
       <PageHeader
         title="Cases"
-        lede="search by application ID or applicant name · at most 10 results · empty by default"
+        lede="keyword search filters cases, not queried by default; returns up to 10 results, sorted by submission time in descending order"
       />
 
       {error && (
-        <Alert tone="negative" title="Search failed">
+        <Alert tone="negative" title="failed to retrieve cases">
           {error}
+        </Alert>
+      )}
+
+      {message && (
+        <Alert tone="warning" title="search notice">
+          {message}
         </Alert>
       )}
 
       <Toolbar>
         <SearchInput
           grow
-          placeholder="Application ID or applicant name — press Enter to search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={handleKeyDown}
+          placeholder="enter keyword (e.g., Application ID)"
+          value={keyword}
+          onChange={(e) => setKeyword(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              search();
+            }
+          }}
           aria-label="Search cases"
         />
+        <Button onClick={search} disabled={loading}>
+          {loading ? 'searching...' : 'search'}
+        </Button>
       </Toolbar>
 
-      {results !== null && (
-        <DataTable
-          columns={columns}
-          rows={results}
-          total={results.length}
-          rowKey={(r) => r.applicationId}
-          footnote={results.length === 10 ? 'showing 10 results — refine your search for more' : 'newest first'}
-          empty={
-            <EmptyState title="No cases match that search">
-              Try a different ID or name.
-            </EmptyState>
-          }
-        />
-      )}
-
-      {results === null && !loading && (
-        <EmptyState title="Enter a search above">
-          Type an application ID (e.g. SIM-15) or an applicant name, then press Enter.
-        </EmptyState>
-      )}
+      <DataTable
+        columns={columns}
+        rows={rows}
+        total={rows.length}
+        rowKey={(r) => r.applicationId}
+        maxRows={null}
+        footnote="submitted desc"
+        empty={
+          <EmptyState title={searched ? 'no matching data' : 'please enter a keyword to search'}>
+            {searched ? 'try a different keyword.' : 'the board is empty by default; no data will be queried without search criteria.'}
+          </EmptyState>
+        }
+      />
     </>
   );
 }

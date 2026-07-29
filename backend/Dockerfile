@@ -3,7 +3,7 @@
 # The --mount=type=cache for ~/.m2 shares the Maven repo across every module build and
 # across rebuilds, so dependencies download once instead of per image.
 
-FROM eclipse-temurin:21-jdk AS build
+FROM eclipse-temurin:21-jdk-jammy AS build
 WORKDIR /app
 COPY .mvn/ .mvn/
 COPY mvnw pom.xml ./
@@ -12,7 +12,7 @@ RUN sed -i 's/\r$//' mvnw && chmod +x mvnw
 RUN --mount=type=cache,target=/root/.m2,sharing=locked \
     ./mvnw -B -q clean package -DskipTests
 
-FROM eclipse-temurin:21-jre AS runtime
+FROM eclipse-temurin:21-jre-jammy AS runtime
 WORKDIR /app
 # curl is used by the compose healthcheck to hit /health.
 RUN apt-get update && apt-get install -y --no-install-recommends curl \
